@@ -19,21 +19,24 @@ fi
 # 创建日志目录
 mkdir -p data/logs
 
-# 激活uv虚拟环境
-echo "激活虚拟环境..."
-source .venv/bin/activate
+# 检查 uv 是否安装
+if ! command -v uv &> /dev/null; then
+    echo "错误: uv 未安装，请先安装 uv"
+    echo "安装命令: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
 
 # 检查服务是否已经在运行
-EXISTING_PID=$(ps aux | grep "graph_service.main" | grep -v grep | awk '{print $2}')
+EXISTING_PID=$(pgrep -f "graph_service.main" | head -1)
 if [ -n "$EXISTING_PID" ]; then
     echo "警告: Graph Service 已经在运行 (PID: $EXISTING_PID)"
     echo "如需重启，请先运行: bash scripts/stop_all.sh"
     exit 1
 fi
 
-# 使用nohup启动Graph Service
-echo "启动Graph Service (后台运行)..."
-nohup python -m graph_service.main > data/logs/graph_service.log 2>&1 &
+# 使用 uv run 启动 Graph Service
+echo "启动 Graph Service (后台运行)..."
+nohup uv run python -m graph_service.main > data/logs/graph_service.log 2>&1 &
 GRAPH_PID=$!
 
 # 保存PID到文件

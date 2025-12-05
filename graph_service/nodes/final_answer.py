@@ -6,26 +6,14 @@ from typing import Dict, Any
 import json
 from loguru import logger
 from ..state import GraphState
-from utils import load_langgraph_config, load_llm_config
+from utils import load_langgraph_config, get_config_manager
 from langchain_community.llms import Ollama
 
 
-# 全局 LLM 实例
-_llm = None
-
-
 def get_llm():
-    """获取或创建 LLM 实例"""
-    global _llm
-    if _llm is None:
-        llm_config = load_llm_config()
-        _llm = Ollama(
-            model=llm_config["llm"]["model"],
-            base_url=llm_config["llm"]["base_url"],
-            temperature=llm_config["llm"]["temperature"]
-        )
-        logger.info(f"LLM 初始化完成（FinalAnswer）: {llm_config['llm']['model']}")
-    return _llm
+    """获取或创建 LLM 实例（使用配置管理器）"""
+    config_manager = get_config_manager()
+    return config_manager.get_llm("final_answer")
 
 
 def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan: list = None) -> str:
@@ -153,15 +141,20 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
     # 第一部分：原始输出
     raw_output = result.get("raw_output", "")
     if raw_output:
-        output += f"""━━━ 📝 原始输出 ━━━
+        output += f"""<details open>
+<summary>📝 原始输出</summary>
+
 ```
 {raw_output.strip()}
 ```
 
+</details>
+
 """
 
     # 第二部分：结构化结果
-    output += "━━━ 📈 结构化结果 ━━━\n"
+    output += "<details open>\n"
+    output += "<summary>📈 结构化结果</summary>\n\n"
 
     # 根据不同工具类型，提取关键信息
     if tool_name == "network.ping":
@@ -256,7 +249,7 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
     if error:
         output += f"\n❌ 错误信息: {error}\n"
 
-    output += "\n"
+    output += "\n</details>\n\n"
 
     return output
 
@@ -339,7 +332,8 @@ def final_answer_node(state: GraphState) -> GraphState:
                 final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
                 # 添加执行过程详情（完整展示）
-                final_answer += "━━━ 📋 执行过程详情 ━━━\n\n"
+                final_answer += "<details open>\n"
+                final_answer += f"<summary>📋 执行过程详情（共 {len(execution_history)} 步）</summary>\n\n"
                 for i, record in enumerate(execution_history, 1):
                     thought = record.get("thought", "")
                     action = record.get("action", {})
@@ -392,7 +386,7 @@ def final_answer_node(state: GraphState) -> GraphState:
 
                     final_answer += "└" + "─" * 50 + "\n\n"
 
-                final_answer += "\n"
+                final_answer += "\n</details>\n\n"
 
                 # 添加 LLM 综合分析（第三段）
                 try:
@@ -402,9 +396,10 @@ def final_answer_node(state: GraphState) -> GraphState:
                     llm_analysis = _generate_llm_analysis(user_query, execution_history, agent_plan)
 
                     if llm_analysis:
-                        final_answer += "━━━ 💡 综合分析 ━━━\n\n"
+                        final_answer += "<details open>\n"
+                        final_answer += "<summary>💡 综合分析</summary>\n\n"
                         final_answer += llm_analysis
-                        final_answer += "\n\n"
+                        final_answer += "\n</details>\n\n"
                 except Exception as e:
                     logger.error(f"生成 LLM 分析时出错: {e}")
 
@@ -459,9 +454,10 @@ def final_answer_node(state: GraphState) -> GraphState:
                 # 添加 LLM 的综合分析（第三部分）
                 llm_analysis = diag_result.get("output", "")
                 if llm_analysis:
-                    final_answer += "━━━ 💡 综合分析 ━━━\n\n"
+                    final_answer += "<details open>\n"
+                    final_answer += "<summary>💡 综合分析</summary>\n\n"
                     final_answer += llm_analysis
-                    final_answer += "\n"
+                    final_answer += "\n</details>\n\n"
             else:
                 # 没有工具结果，只显示 LLM 的输出
                 if "output" in diag_result:

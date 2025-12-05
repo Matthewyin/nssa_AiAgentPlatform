@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 from langchain_community.llms import Ollama
 from ..state import GraphState
-from utils import load_langgraph_config, load_router_prompt_config, settings
+from utils import load_langgraph_config, load_router_prompt_config, settings, get_config_manager
 
 
 def router_node(state: GraphState) -> GraphState:
@@ -292,12 +292,9 @@ def _llm_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
         user_prompt = user_prompt_template.format(user_query=user_query)
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
-        # 调用 LLM
-        llm = Ollama(
-            base_url=settings.ollama_base_url,
-            model=llm_config.get("model", "deepseek-r1:8b"),
-            temperature=llm_config.get("temperature", 0.1),
-        )
+        # 调用 LLM（使用配置管理器）
+        config_manager = get_config_manager()
+        llm = config_manager.get_llm("router")
 
         logger.info(f"Router: 调用 LLM 进行路由决策...")
         response = llm.invoke(full_prompt)

@@ -6,27 +6,15 @@ from typing import Dict, Any
 from loguru import logger
 from ..state import GraphState
 from langchain_community.llms import Ollama
-from utils import load_llm_config
+from utils import get_config_manager
 import re
 import json
 
 
-# 全局 LLM 实例
-_llm = None
-
-
 def get_llm():
-    """获取或创建 LLM 实例"""
-    global _llm
-    if _llm is None:
-        llm_config = load_llm_config()
-        _llm = Ollama(
-            model=llm_config["llm"]["model"],
-            base_url=llm_config["llm"]["base_url"],
-            temperature=llm_config["llm"]["temperature"]
-        )
-        logger.info(f"LLM 初始化完成: {llm_config['llm']['model']}")
-    return _llm
+    """获取或创建 LLM 实例（使用配置管理器）"""
+    config_manager = get_config_manager()
+    return config_manager.get_llm("react_think")
 
 
 def build_think_prompt(state: GraphState, available_tools: list) -> str:

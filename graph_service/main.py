@@ -14,7 +14,7 @@ from loguru import logger
 from .graph import compile_graph
 from .state import GraphState
 from .openai_api import router as openai_router
-from utils import settings, setup_logger
+from utils import settings, setup_logger, get_config_manager, start_config_watcher, stop_config_watcher
 
 # 加载 .env 文件到环境变量
 env_path = Path(__file__).parent.parent / ".env"
@@ -48,6 +48,30 @@ app.include_router(openai_router, tags=["OpenAI Compatible API"])
 # 编译LangGraph图
 graph = compile_graph()
 
+# 创建全局配置管理器
+config_manager = get_config_manager()
+
+# 配置监听器（在 startup 事件中启动）
+config_watcher = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动事件"""
+    global config_watcher
+    # 启动配置文件监听器
+    config_watcher = start_config_watcher(config_manager)
+    logger.info("应用启动完成")
+    logger.info("配置文件热加载已启用")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭事件"""
+    logger.info("正在关闭应用...")
+    stop_config_watcher(config_watcher)
+    logger.info("应用已关闭")
+
 
 class ChatRequest(BaseModel):
     """聊天请求模型"""
@@ -67,8 +91,44 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "graph_service",
-        "version": "0.1.0"
+        "version": "0.1.0",
+        "config_hot_reload": "enabled"
     }
+
+
+@app.post("/reload-config")
+async def reload_config(config_name: str = "all"):
+    """
+    手动重新加载配置文件
+
+    Args:
+        config_name: 配置名称（llm_config, agent_config, all）
+
+    Returns:
+        重载结果
+    """
+    try:
+        if config_name == "all":
+            # 清除所有缓存
+            for cached_config in config_manager.get_cached_configs():
+                config_manager.invalidate_cache(cached_config)
+            logger.info("已清除所有配置缓存")
+            return {
+                "status": "success",
+                "message": "所有配置将在下次使用时自动重新加载",
+                "configs_cleared": config_manager.get_cached_configs()
+            }
+        else:
+            # 清除指定配置
+            config_manager.invalidate_cache(config_name)
+            logger.info(f"已清除配置缓存: {config_name}")
+            return {
+                "status": "success",
+                "message": f"配置 {config_name} 将在下次使用时自动重新加载"
+            }
+    except Exception as e:
+        logger.error(f"重新加载配置失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/chat", response_model=ChatResponse)

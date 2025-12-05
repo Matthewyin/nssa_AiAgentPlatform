@@ -18,7 +18,7 @@ if [ -f "data/logs/graph_service.pid" ]; then
 fi
 
 # 方法2: 查找并停止所有Graph Service进程
-GRAPH_PIDS=$(ps aux | grep "graph_service.main" | grep -v grep | awk '{print $2}')
+GRAPH_PIDS=$(pgrep -f "graph_service.main")
 
 if [ -n "$GRAPH_PIDS" ]; then
     echo "发现运行中的Graph Service进程: $GRAPH_PIDS"
@@ -26,6 +26,19 @@ if [ -n "$GRAPH_PIDS" ]; then
         echo "停止进程 $PID..."
         kill $PID
     done
+
+    # 等待进程结束
+    sleep 1
+
+    # 检查是否还有进程存在，如果有则强制杀死
+    REMAINING_PIDS=$(pgrep -f "graph_service.main")
+    if [ -n "$REMAINING_PIDS" ]; then
+        echo "强制停止残留进程: $REMAINING_PIDS"
+        for PID in $REMAINING_PIDS; do
+            kill -9 $PID
+        done
+    fi
+
     echo "✅ 所有Graph Service进程已停止"
 else
     echo "ℹ️  Graph Service未运行"
