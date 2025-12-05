@@ -1,0 +1,348 @@
+"""
+FinalAnswer节点
+生成最终回复
+"""
+from typing import Dict, Any
+import json
+from loguru import logger
+from ..state import GraphState
+from utils import load_langgraph_config
+
+
+def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], result_json: str) -> str:
+    """
+    格式化工具结果为三段式输出
+
+    Args:
+        tool_name: 工具名称
+        params: 工具参数
+        result_json: 工具返回的JSON字符串
+
+    Returns:
+        格式化后的三段式文本
+    """
+    try:
+        # 解析JSON结果
+        result = json.loads(result_json)
+    except json.JSONDecodeError:
+        # 如果不是JSON，直接返回原始结果
+        return f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 工具: {tool_name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 原始输出:
+{result_json}
+"""
+
+    # 工具名称映射（更友好的显示）
+    tool_display_names = {
+        "network.ping": "Ping 连通性测试",
+        "network.traceroute": "Traceroute 路径追踪",
+        "network.nslookup": "DNS 域名解析",
+        "network.mtr": "MTR 网络质量测试"
+    }
+    display_name = tool_display_names.get(tool_name, tool_name)
+
+    # 构建输出
+    output = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 工具: {display_name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"""
+
+    # 第一部分：原始输出
+    raw_output = result.get("raw_output", "")
+    if raw_output:
+        output += f"""━━━ 📝 原始输出 ━━━
+```
+{raw_output.strip()}
+```
+
+"""
+
+    # 第二部分：结构化结果
+    output += "━━━ 📈 结构化结果 ━━━\n"
+
+    # 根据不同工具类型，提取关键信息
+    if tool_name == "network.ping":
+        success = result.get("success", False)
+        target = result.get("target", "N/A")
+        count = result.get("count", 0)
+        summary = result.get("summary", {})
+
+        status_icon = "✅" if success else "❌"
+        output += f"{status_icon} 连接状态: {'正常' if success else '失败'}\n"
+        output += f"📍 目标地址: {target}\n"
+        output += f"📊 统计数据:\n"
+        output += f"   • 发送: {count} 包\n"
+
+        if summary:
+            packet_loss = summary.get("packet_loss_line", "")
+            rtt_line = summary.get("rtt_line", "")
+            if packet_loss:
+                output += f"   • {packet_loss}\n"
+            if rtt_line:
+                output += f"   • {rtt_line}\n"
+
+    elif tool_name == "network.nslookup":
+        success = result.get("success", False)
+        domain = result.get("domain", "N/A")
+        record_type = result.get("record_type", "A")
+
+        status_icon = "✅" if success else "❌"
+        output += f"{status_icon} 查询状态: {'成功' if success else '失败'}\n"
+        output += f"🌐 域名: {domain}\n"
+        output += f"🔍 记录类型: {record_type}\n"
+
+        # 尝试从原始输出中提取IP地址
+        if raw_output and success:
+            import re
+            ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+            ips = re.findall(ip_pattern, raw_output)
+            # 过滤掉DNS服务器的IP（通常在前面）
+            if len(ips) > 1:
+                output += f"📍 解析结果: {', '.join(ips[1:])}\n"
+            elif ips:
+                output += f"📍 解析结果: {ips[0]}\n"
+
+    elif tool_name == "network.traceroute":
+        success = result.get("success", False)
+        target = result.get("target", "N/A")
+        max_hops = result.get("max_hops", 30)
+
+        status_icon = "✅" if success else "❌"
+        output += f"{status_icon} 追踪状态: {'完成' if success else '失败'}\n"
+        output += f"🎯 目标: {target}\n"
+        output += f"🔢 最大跳数: {max_hops}\n"
+
+        # 统计实际跳数
+        if raw_output:
+            hop_count = raw_output.count('\n')
+            output += f"📊 实际跳数: 约 {hop_count} 跳\n"
+
+    elif tool_name == "network.mtr":
+        success = result.get("success", False)
+        target = result.get("target", "N/A")
+        count = result.get("count", 10)
+        summary = result.get("summary", {})
+
+        status_icon = "✅" if success else "❌"
+        output += f"{status_icon} 测试状态: {'完成' if success else '失败'}\n"
+        output += f"🎯 目标: {target}\n"
+        output += f"📊 测试包数: {count}\n"
+
+        if summary:
+            hops = summary.get("hops", [])
+            total_hops = summary.get("total_hops", 0)
+            output += f"🔢 总跳数: {total_hops} 跳\n"
+
+            # 检查是否有丢包
+            if hops:
+                has_loss = any(float(hop.get("loss_percent", "0%").rstrip('%')) > 0 for hop in hops)
+                if has_loss:
+                    output += "⚠️  检测到丢包\n"
+                else:
+                    output += "✅ 全程无丢包\n"
+
+    else:
+        # 通用格式
+        success = result.get("success", False)
+        status_icon = "✅" if success else "❌"
+        output += f"{status_icon} 执行状态: {'成功' if success else '失败'}\n"
+        output += f"📋 参数: {json.dumps(params, ensure_ascii=False)}\n"
+
+    # 如果有错误信息
+    error = result.get("error")
+    if error:
+        output += f"\n❌ 错误信息: {error}\n"
+
+    output += "\n"
+
+    return output
+
+
+def final_answer_node(state: GraphState) -> GraphState:
+    """
+    最终回复节点
+    
+    Args:
+        state: 当前状态
+        
+    Returns:
+        更新后的状态
+    """
+    state["current_node"] = "final_answer"
+    
+    # 加载配置
+    config = load_langgraph_config()
+    node_config = config.get("langgraph", {}).get("nodes", {}).get("final_answer", {})
+    
+    # 组合结果
+    final_answer = ""
+
+    # 检查是否已经有预设的 final_answer (例如被 router 跳过的请求)
+    if state.get("final_answer"):
+        final_answer = state["final_answer"]
+    else:
+        # 优先处理 ReAct 模式的 execution_history
+        if state.get("execution_history") and len(state["execution_history"]) > 0:
+            # ReAct 模式：从 execution_history 提取结果
+            execution_history = state["execution_history"]
+
+            # 统计工具调用次数
+            tool_calls = [record for record in execution_history if record.get("action", {}).get("type") == "TOOL"]
+            tool_count = len(tool_calls)
+
+            if tool_count > 0:
+                # 添加标题
+                if tool_count == 1:
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    final_answer += "📊 网络诊断结果\n"
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                else:
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    final_answer += f"📊 网络诊断结果（共执行 {tool_count} 个工具）\n"
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+                # 格式化每个工具的结果
+                for i, record in enumerate(tool_calls, 1):
+                    action = record.get("action", {})
+                    tool_name = action.get("tool")
+                    params = action.get("params", {})
+                    observation = record.get("observation", "")
+
+                    if tool_count > 1:
+                        final_answer += f"\n【工具 {i}/{tool_count}】"
+
+                    # 从观察结果中提取工具返回的 JSON
+                    # 观察结果格式：工具 network.ping 执行成功。结果:\n{json}
+                    if "执行成功" in observation and "结果:" in observation:
+                        try:
+                            result_json = observation.split("结果:")[1].strip()
+                            formatted = _format_tool_result_three_sections(tool_name, params, result_json)
+                            final_answer += formatted
+                        except Exception as e:
+                            logger.warning(f"解析工具结果失败: {e}")
+                            final_answer += f"\n{observation}\n"
+                    else:
+                        # 工具执行失败或格式不符
+                        final_answer += f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 工具: {tool_name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{observation}
+
+"""
+
+                # 添加分隔线
+                final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+                # 添加执行过程摘要
+                final_answer += "━━━ 📋 执行过程 ━━━\n\n"
+                for i, record in enumerate(execution_history, 1):
+                    thought = record.get("thought", "")
+                    action = record.get("action", {})
+                    action_type = action.get("type", "")
+
+                    if action_type == "TOOL":
+                        tool_name = action.get("tool", "")
+                        final_answer += f"步骤 {i}: 执行工具 {tool_name}\n"
+                        if thought:
+                            final_answer += f"  思考: {thought[:100]}...\n"
+                    elif action_type == "FINISH":
+                        final_answer += f"步骤 {i}: 完成任务\n"
+
+                final_answer += "\n"
+
+        # 向后兼容：处理旧模式的 network_diag_result
+        elif state.get("network_diag_result"):
+            diag_result = state["network_diag_result"]
+
+            # 获取所有工具的执行结果
+            all_results = diag_result.get("all_results", [])
+
+            if all_results:
+                # 添加标题
+                tool_count = len(all_results)
+                if tool_count == 1:
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    final_answer += "📊 网络诊断结果\n"
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                else:
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    final_answer += f"📊 网络诊断结果（共执行 {tool_count} 个工具）\n"
+                    final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+                # 格式化每个工具的结果
+                for i, result in enumerate(all_results, 1):
+                    tool_name = result.get("tool_name", "unknown")
+                    params = result.get("params", {})
+                    tool_result = result.get("result", "")
+                    success = result.get("success", False)
+
+                    if tool_count > 1:
+                        final_answer += f"\n【工具 {i}/{tool_count}】"
+
+                    if success:
+                        # 格式化为三段式输出
+                        formatted = _format_tool_result_three_sections(tool_name, params, tool_result)
+                        final_answer += formatted
+                    else:
+                        # 工具执行失败
+                        error = result.get("error", "未知错误")
+                        final_answer += f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 工具: {tool_name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ 执行失败: {error}
+
+"""
+
+                # 添加分隔线
+                final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+                # 添加 LLM 的综合分析（第三部分）
+                llm_analysis = diag_result.get("output", "")
+                if llm_analysis:
+                    final_answer += "━━━ 💡 综合分析 ━━━\n\n"
+                    final_answer += llm_analysis
+                    final_answer += "\n"
+            else:
+                # 没有工具结果，只显示 LLM 的输出
+                if "output" in diag_result:
+                    final_answer += diag_result["output"]
+
+        # 添加RAG结果(如果有)
+        if state.get("rag_result"):
+            rag_result = state["rag_result"]
+            if "output" in rag_result:
+                final_answer += "\n\n" + rag_result["output"]
+
+        # 如果有错误,添加错误信息
+        if state.get("errors"):
+            final_answer += "\n\n⚠️ 执行过程中遇到以下问题:\n"
+            for error in state["errors"]:
+                final_answer += f"- {error}\n"
+
+        # 如果没有任何结果,返回默认消息
+        if not final_answer:
+            final_answer = "抱歉,无法处理您的请求。"
+    
+    state["final_answer"] = final_answer
+    
+    # 添加元数据
+    if node_config.get("include_metadata", True):
+        end_time = __import__("time").time()
+        start_time = state.get("metadata", {}).get("start_time", end_time)
+        duration = end_time - start_time
+        
+        state["metadata"]["end_time"] = end_time
+        state["metadata"]["duration"] = duration
+        
+        logger.info(f"请求处理完成,耗时: {duration:.2f}秒")
+    
+    return state

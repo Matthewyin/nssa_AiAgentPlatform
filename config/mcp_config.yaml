@@ -1,0 +1,34 @@
+# MCP Server 配置
+mcp_servers:
+  # 网络诊断 MCP Server
+  - name: network-mcp
+    command: python
+    args:
+      - "-m"
+      - "mcp_servers.network_mcp.server"
+    tools_prefix: "network"
+    description: "网络诊断工具集"
+
+  # MySQL 数据库 MCP Server
+  - name: mysql-mcp
+    command: uvx
+    args:
+      - "mcp-server-mysql"
+    tools_prefix: "mysql"
+    description: "MySQL 数据库查询工具集"
+    env:
+      MYSQL_HOST: "${MYSQL_HOST}"
+      MYSQL_PORT: "${MYSQL_PORT}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+      MYSQL_ALLOW_WRITE: "${MYSQL_ALLOW_WRITE}"
+
+  # RAG MCP Server (暂时注释,后续启用)
+  # - name: rag-mcp
+  #   command: python
+  #   args:
+  #     - "-m"
+  #     - "mcp_servers.rag_mcp.server"
+  #   tools_prefix: "rag"
+  #   description: "知识库检索工具集"

@@ -1,0 +1,35 @@
+# LangChain 配置
+langchain:
+  # Agent执行器配置
+  agent_executor:
+    verbose: true  # 是否打印详细日志
+    handle_parsing_errors: true  # 是否处理解析错误
+    max_iterations: 5  # 最大迭代次数
+    max_execution_time: 60  # 最大执行时间(秒)
+    early_stopping_method: "generate"  # 早停方法: generate 或 force
+    
+  # Prompt模板配置
+  prompt:
+    react_template: |
+      {system_prompt}
+
+      你有以下工具可用:
+      {tools}
+
+      工具名称: {tool_names}
+
+      使用以下格式回答:
+
+      Question: 用户的问题
+      Thought: 你应该思考要做什么
+      Action: 要使用的工具名称
+      Action Input: 工具的输入参数(JSON格式)
+      Observation: 工具的执行结果
+      ... (这个Thought/Action/Action Input/Observation可以重复N次)
+      Thought: 我现在知道最终答案了
+      Final Answer: 对用户问题的最终回答
+
+      开始!
+
+      Question: {input}
+      Thought: {agent_scratchpad}

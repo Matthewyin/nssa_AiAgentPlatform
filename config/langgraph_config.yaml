@@ -1,0 +1,61 @@
+# LangGraph 配置
+langgraph:
+  # Graph执行配置
+  execution:
+    max_steps: 20  # 最大执行步数
+    timeout: 120  # 超时时间(秒)
+    stream_mode: "values"  # 流式模式: values, updates, debug
+    
+  # Router节点配置
+  router:
+    # 关键词路由规则
+    keyword_rules:
+      - keywords: ["ping", "连通", "可达", "延迟", "丢包"]
+        target_node: "network_agent"
+      - keywords: ["traceroute", "路径", "跳数", "路由"]
+        target_node: "network_agent"
+      - keywords: ["dns", "域名", "解析", "nslookup"]
+        target_node: "network_agent"
+      - keywords: ["数据库", "mysql", "查询", "表", "sql", "select", "database"]
+        target_node: "database_agent"
+      - keywords: ["历史", "案例", "文档", "知识库"]
+        target_node: "rag_agent"
+    
+    # 是否使用LLM作为后备路由
+    use_llm_fallback: true
+    
+    # LLM路由的Prompt
+    llm_router_prompt: |
+      根据用户的问题,判断应该使用哪个Agent:
+      - network_agent: 处理网络诊断相关问题(ping, traceroute, DNS等)
+      - database_agent: 处理数据库查询相关问题(MySQL查询、表结构查看等)
+      - rag_agent: 处理知识库检索和历史案例查询
+
+      用户问题: {query}
+
+      只返回Agent名称,不要有其他内容。
+      
+  # 节点配置
+  nodes:
+    user_input:
+      validate_input: true  # 是否验证输入
+      max_length: 8000  # 最大输入长度
+      
+    network_agent:
+      timeout: 60  # 节点超时时间
+      retry_on_error: true  # 是否在错误时重试
+      max_retries: 1
+
+    database_agent:
+      timeout: 60
+      retry_on_error: true
+      max_retries: 1
+
+    rag_agent:
+      timeout: 30
+      retry_on_error: true
+      max_retries: 1
+      
+    final_answer:
+      format_output: true  # 是否格式化输出
+      include_metadata: true  # 是否包含元数据

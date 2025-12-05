@@ -1,0 +1,137 @@
+# 工作流模板配置
+# 定义常用的工作流模板，用户可以通过关键词或命令触发
+
+templates:
+  # 模板 1: 域名诊断（查询域名 IP + ping 测试）
+  - name: "domain_diagnosis"
+    description: "域名诊断：查询域名的 IP 地址并测试连通性"
+    keywords: 
+      - "域名诊断"
+      - "域名测试"
+      - "域名检查"
+      - "检查域名"
+      - "诊断域名"
+    agents:
+      - name: "database_agent"
+        task_template: "查询 {database} 数据库的 {table} 表中 {domain} 的 IP 地址"
+      - name: "network_agent"
+        task_template: "使用 ping 测试 {domain} 的连通性"
+    parameters:
+      - name: "database"
+        description: "数据库名称"
+        default: "iteams_db"
+        required: false
+      - name: "table"
+        description: "表名"
+        default: "domain_records"
+        required: false
+      - name: "domain"
+        description: "域名"
+        required: true
+        extract_pattern: "(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}"
+    example: "域名诊断 example.com"
+
+  # 模板 2: 完整网络诊断（查询域名 IP + ping + traceroute + mtr）
+  - name: "full_network_diagnosis"
+    description: "完整网络诊断：查询域名 IP，并进行 ping、traceroute、mtr 测试"
+    keywords:
+      - "完整诊断"
+      - "全面诊断"
+      - "深度诊断"
+      - "详细诊断"
+    agents:
+      - name: "database_agent"
+        task_template: "查询 {database} 数据库的 {table} 表中 {domain} 的 IP 地址"
+      - name: "network_agent"
+        task_template: "对 {domain} 进行完整的网络诊断：ping、traceroute、mtr"
+    parameters:
+      - name: "database"
+        description: "数据库名称"
+        default: "iteams_db"
+        required: false
+      - name: "table"
+        description: "表名"
+        default: "domain_records"
+        required: false
+      - name: "domain"
+        description: "域名"
+        required: true
+        extract_pattern: "(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}"
+    example: "完整诊断 example.com"
+
+  # 模板 3: 数据库查询
+  - name: "database_query"
+    description: "数据库查询：查询指定数据库的数据"
+    keywords:
+      - "查询数据库"
+      - "数据库查询"
+      - "查询表"
+      - "查看数据"
+    agents:
+      - name: "database_agent"
+        task_template: "查询 {database} 数据库的 {table} 表{condition}"
+    parameters:
+      - name: "database"
+        description: "数据库名称"
+        required: true
+      - name: "table"
+        description: "表名"
+        required: true
+      - name: "condition"
+        description: "查询条件"
+        default: ""
+        required: false
+    example: "查询 iteams_db 数据库的 domain_records 表中 example.com 的记录"
+
+  # 模板 4: 网络连通性测试
+  - name: "network_connectivity"
+    description: "网络连通性测试：测试指定目标的网络连通性"
+    keywords:
+      - "ping"
+      - "测试连通性"
+      - "连通性测试"
+      - "网络测试"
+    agents:
+      - name: "network_agent"
+        task_template: "使用 ping 测试 {target} 的连通性"
+    parameters:
+      - name: "target"
+        description: "目标地址（IP 或域名）"
+        required: true
+    example: "ping 8.8.8.8"
+
+  # 模板 5: 路由追踪
+  - name: "route_trace"
+    description: "路由追踪：追踪到目标的网络路径"
+    keywords:
+      - "traceroute"
+      - "路由追踪"
+      - "追踪路由"
+      - "网络路径"
+    agents:
+      - name: "network_agent"
+        task_template: "使用 traceroute 追踪到 {target} 的路由"
+    parameters:
+      - name: "target"
+        description: "目标地址（IP 或域名）"
+        required: true
+    example: "traceroute 8.8.8.8"
+
+  # 模板 6: DNS 查询
+  - name: "dns_lookup"
+    description: "DNS 查询：查询域名的 DNS 记录"
+    keywords:
+      - "nslookup"
+      - "dns查询"
+      - "查询dns"
+      - "域名解析"
+    agents:
+      - name: "network_agent"
+        task_template: "使用 nslookup 查询 {domain} 的 DNS 记录"
+    parameters:
+      - name: "domain"
+        description: "域名"
+        required: true
+        extract_pattern: "(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}"
+    example: "nslookup example.com"
+

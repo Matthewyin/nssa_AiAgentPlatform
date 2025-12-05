@@ -1,0 +1,53 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+*.log
+data/logs/
+*.pid
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+data/vector_db/
+
+# 案例数据（可能包含敏感信息）
+data/cases/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS 系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/

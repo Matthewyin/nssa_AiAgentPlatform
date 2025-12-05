@@ -1,0 +1,61 @@
+[project]
+name = "aiagent-netools"
+version = "0.1.0"
+description = "基于 LangGraph + LangChain + MCP 的智能网络诊断系统"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # LangChain 生态
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.20",
+    "langgraph>=0.0.30",
+    
+    # FastAPI 和服务器
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+    
+    # MCP 协议
+    "mcp>=0.1.0",
+    
+    # 向量数据库和嵌入
+    "chromadb>=0.4.22",
+    "sentence-transformers>=2.3.0",
+    
+    # 工具和实用程序
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.1",
+    
+    # HTTP 客户端
+    "httpx>=0.26.0",
+    "aiohttp>=3.9.0",
+    
+    # 日志和监控
+    "loguru>=0.7.2",
+    
+    # 测试
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "graph_service",
+    "agents",
+    "mcp_manager",
+    "mcp_servers",
+    "utils"
+]
+
+[tool.uv]
+dev-dependencies = [
+    "black>=24.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+]

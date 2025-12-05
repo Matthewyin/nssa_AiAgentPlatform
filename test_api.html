@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Agent API测试</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        #result { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; white-space: pre-wrap; }
+        #loading { display: none; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>AI Agent Network Tools API 测试</h1>
+    
+    <button onclick="testAPI()">测试 Ping 8.8.8.8</button>
+    <div id="loading">正在处理,请稍候(约30秒)...</div>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            
+            resultDiv.textContent = '';
+            loadingDiv.style.display = 'block';
+            
+            try {
+                const response = await fetch('http://localhost:8000/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'aiagent-network-tools',
+                        messages: [{role: 'user', content: 'ping 8.8.8.8'}]
+                    })
+                });
+                
+                loadingDiv.style.display = 'none';
+                
+                const contentType = response.headers.get('content-type');
+                resultDiv.textContent = `状态: ${response.status}\n`;
+                resultDiv.textContent += `Content-Type: ${contentType}\n\n`;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    resultDiv.textContent += `响应:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    const text = await response.text();
+                    resultDiv.textContent += `响应(非JSON):\n${text}`;
+                }
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                resultDiv.textContent = `错误: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

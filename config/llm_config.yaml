@@ -1,0 +1,14 @@
+# LLM 配置
+llm:
+  provider: "ollama"
+  base_url: "http://localhost:11434"
+  model: "deepseek-r1:8b"
+  temperature: 0.7
+  max_tokens: 8000
+  timeout: 120
+
+# Embedding 配置
+embedding:
+  provider: "ollama"
+  base_url: "http://localhost:11434"
+  model: "nomic-embed-text"

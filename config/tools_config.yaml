@@ -1,0 +1,132 @@
+# 工具配置
+# 定义所有MCP工具的参数schema和默认值
+
+tools:
+  # 网络诊断工具
+  network:
+    ping:
+      name: "network.ping"
+      description: "使用ping命令检查目标主机的可达性和网络延迟"
+      parameters:
+        target:
+          type: "string"
+          description: "目标主机的IP地址或域名"
+          required: true
+        count:
+          type: "integer"
+          description: "发送ping包的数量"
+          default: 4
+          min: 1
+          max: 100
+      timeout: 30  # 工具执行超时时间(秒)
+      
+    traceroute:
+      name: "network.traceroute"
+      description: "使用traceroute命令追踪到目标主机的网络路径"
+      parameters:
+        target:
+          type: "string"
+          description: "目标主机的IP地址或域名"
+          required: true
+        max_hops:
+          type: "integer"
+          description: "最大跳数"
+          default: 30
+          min: 1
+          max: 64
+      timeout: 60  # traceroute需要更长时间
+      
+    nslookup:
+      name: "network.nslookup"
+      description: "使用nslookup命令查询域名的DNS记录"
+      parameters:
+        target:
+          type: "string"
+          description: "要查询的域名"
+          required: true
+        record_type:
+          type: "string"
+          description: "DNS记录类型"
+          default: "A"
+          enum: ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"]
+      timeout: 10
+      
+    mtr:
+      name: "network.mtr"
+      description: "使用mtr命令结合ping和traceroute功能,实时监控网络路径质量"
+      parameters:
+        target:
+          type: "string"
+          description: "目标主机的IP地址或域名"
+          required: true
+        count:
+          type: "integer"
+          description: "发送的测试包数量"
+          default: 10
+          min: 1
+          max: 100
+        report_cycles:
+          type: "integer"
+          description: "报告周期数"
+          default: 10
+          min: 1
+          max: 100
+      timeout: 60  # mtr需要较长时间收集数据
+      
+  # MySQL 数据库工具
+  mysql:
+    list_tables:
+      name: "mysql.list_tables"
+      description: "列出数据库中的所有表"
+      parameters: {}
+      timeout: 10
+
+    describe_table:
+      name: "mysql.describe_table"
+      description: "查看指定表的结构（字段名、类型、约束等）"
+      parameters:
+        table_name:
+          type: "string"
+          description: "表名"
+          required: true
+      timeout: 10
+
+    execute_query:
+      name: "mysql.execute_query"
+      description: "执行 SQL 查询语句（支持 SELECT、SHOW 等查询语句）"
+      parameters:
+        query:
+          type: "string"
+          description: "SQL 查询语句"
+          required: true
+      timeout: 30
+
+    fetch_data:
+      name: "mysql.fetch_data"
+      description: "从指定表获取数据"
+      parameters:
+        table_name:
+          type: "string"
+          description: "表名"
+          required: true
+        limit:
+          type: "integer"
+          description: "返回结果数量限制"
+          default: 100
+      timeout: 30
+
+  # RAG工具 (后续扩展)
+  # rag:
+  #   search_cases:
+  #     name: "rag.search_cases"
+  #     description: "搜索历史案例"
+  #     parameters:
+  #       query:
+  #         type: "string"
+  #         description: "搜索关键词"
+  #         required: true
+  #       limit:
+  #         type: "integer"
+  #         description: "返回结果数量"
+  #         default: 5
+  #     timeout: 10
