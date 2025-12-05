@@ -6,7 +6,105 @@ from typing import Dict, Any
 import json
 from loguru import logger
 from ..state import GraphState
-from utils import load_langgraph_config
+from utils import load_langgraph_config, load_llm_config
+from langchain_community.llms import Ollama
+
+
+# 全局 LLM 实例
+_llm = None
+
+
+def get_llm():
+    """获取或创建 LLM 实例"""
+    global _llm
+    if _llm is None:
+        llm_config = load_llm_config()
+        _llm = Ollama(
+            model=llm_config["llm"]["model"],
+            base_url=llm_config["llm"]["base_url"],
+            temperature=llm_config["llm"]["temperature"]
+        )
+        logger.info(f"LLM 初始化完成（FinalAnswer）: {llm_config['llm']['model']}")
+    return _llm
+
+
+def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan: list = None) -> str:
+    """
+    生成 LLM 综合分析
+
+    Args:
+        user_query: 用户的原始问题
+        execution_history: 执行历史记录
+        agent_plan: Agent 执行计划（多 Agent 场景）
+
+    Returns:
+        LLM 生成的综合分析
+    """
+    try:
+        # 构建执行摘要
+        execution_summary = ""
+        tool_calls = [record for record in execution_history if record.get("action", {}).get("type") == "TOOL"]
+
+        if tool_calls:
+            execution_summary += "执行步骤：\n"
+            for i, record in enumerate(tool_calls, 1):
+                action = record.get("action", {})
+                tool_name = action.get("tool", "")
+                observation = record.get("observation", "")
+
+                # 提取工具执行结果的关键信息
+                result_summary = ""
+                if "执行成功" in observation:
+                    result_summary = "成功"
+                elif "执行失败" in observation or "错误" in observation:
+                    result_summary = "失败"
+                else:
+                    result_summary = "完成"
+
+                execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n"
+
+        # 构建多 Agent 信息
+        agent_info = ""
+        if agent_plan and len(agent_plan) > 1:
+            agent_info = "\n多 Agent 协作：\n"
+            for i, plan in enumerate(agent_plan, 1):
+                agent_name = plan.get("agent", "")
+                task = plan.get("task", "")
+                agent_info += f"{i}. {agent_name}: {task}\n"
+
+        # 构建 Prompt
+        prompt = f"""你是一个专业的网络诊断分析专家。请根据以下信息，生成一份综合分析报告。
+
+用户问题：
+{user_query}
+{agent_info}
+{execution_summary}
+
+请提供以下内容：
+
+1. **任务完成情况**：简要说明任务是否完成，完成了哪些工作
+2. **关键发现**：从执行结果中提取关键信息和发现
+3. **问题诊断**：如果发现问题，进行诊断和分析
+4. **建议**：给出后续操作建议或优化建议
+
+要求：
+- 使用中文回复
+- 简洁明了，重点突出
+- 使用 Markdown 格式
+- 不要重复执行过程的详细信息
+- 专注于分析和洞察
+
+请开始分析："""
+
+        # 调用 LLM
+        llm = get_llm()
+        analysis = llm.invoke(prompt)
+
+        return analysis.strip()
+
+    except Exception as e:
+        logger.error(f"生成 LLM 分析失败: {e}")
+        return "抱歉，无法生成综合分析。"
 
 
 def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], result_json: str) -> str:
@@ -240,22 +338,75 @@ def final_answer_node(state: GraphState) -> GraphState:
                 # 添加分隔线
                 final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-                # 添加执行过程摘要
-                final_answer += "━━━ 📋 执行过程 ━━━\n\n"
+                # 添加执行过程详情（完整展示）
+                final_answer += "━━━ 📋 执行过程详情 ━━━\n\n"
                 for i, record in enumerate(execution_history, 1):
                     thought = record.get("thought", "")
                     action = record.get("action", {})
                     action_type = action.get("type", "")
+                    observation = record.get("observation", "")
 
+                    # 使用框线格式展示每一步
+                    final_answer += f"┌─ 步骤 {i} " + "─" * 40 + "\n"
+
+                    # 展示思考过程（完整内容）
+                    if thought:
+                        final_answer += "│ 🤔 思考:\n"
+                        # 将思考内容按行分割，每行前面加上 "│ "
+                        for line in thought.split('\n'):
+                            final_answer += f"│ {line}\n"
+                        final_answer += "│\n"
+
+                    # 展示行动（完整参数）
                     if action_type == "TOOL":
                         tool_name = action.get("tool", "")
-                        final_answer += f"步骤 {i}: 执行工具 {tool_name}\n"
-                        if thought:
-                            final_answer += f"  思考: {thought[:100]}...\n"
+                        params = action.get("params", {})
+                        final_answer += "│ 🔧 行动:\n"
+                        final_answer += f"│ 工具: {tool_name}\n"
+                        if params:
+                            final_answer += "│ 参数: "
+                            # 格式化 JSON 参数
+                            params_json = json.dumps(params, ensure_ascii=False, indent=2)
+                            # 将 JSON 的每一行前面加上 "│ "
+                            params_lines = params_json.split('\n')
+                            final_answer += params_lines[0] + "\n"
+                            for line in params_lines[1:]:
+                                final_answer += f"│ {line}\n"
+                        final_answer += "│\n"
                     elif action_type == "FINISH":
-                        final_answer += f"步骤 {i}: 完成任务\n"
+                        final_answer += "│ ✅ 行动: 完成任务\n"
+                        final_answer += "│\n"
+
+                    # 展示观察结果（完整内容，但限制长度避免过长）
+                    if observation:
+                        final_answer += "│ 📊 观察:\n"
+                        # 如果观察结果太长（超过 500 字符），截断并提示
+                        if len(observation) > 500:
+                            observation_display = observation[:500] + "...\n│ （结果过长，已截断）"
+                        else:
+                            observation_display = observation
+
+                        # 将观察结果按行分割，每行前面加上 "│ "
+                        for line in observation_display.split('\n'):
+                            final_answer += f"│ {line}\n"
+
+                    final_answer += "└" + "─" * 50 + "\n\n"
 
                 final_answer += "\n"
+
+                # 添加 LLM 综合分析（第三段）
+                try:
+                    user_query = state.get("user_query", "")
+                    agent_plan = state.get("agent_plan", [])
+
+                    llm_analysis = _generate_llm_analysis(user_query, execution_history, agent_plan)
+
+                    if llm_analysis:
+                        final_answer += "━━━ 💡 综合分析 ━━━\n\n"
+                        final_answer += llm_analysis
+                        final_answer += "\n\n"
+                except Exception as e:
+                    logger.error(f"生成 LLM 分析时出错: {e}")
 
         # 向后兼容：处理旧模式的 network_diag_result
         elif state.get("network_diag_result"):
