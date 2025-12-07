@@ -8,6 +8,18 @@ from ..state import GraphState
 from utils import load_langgraph_config
 
 
+def _is_followup_request(query: str) -> bool:
+    """检测是否为 OpenWebUI 的 follow-up questions 请求"""
+    query_lower = query.lower()
+    # 检测特征：包含 "### Task:" 和 "follow-up" 或 "suggest" + "question"
+    if "### task:" in query_lower:
+        if "follow-up" in query_lower or "follow_up" in query_lower:
+            return True
+        if "suggest" in query_lower and "question" in query_lower:
+            return True
+    return False
+
+
 def user_input_node(state: GraphState) -> GraphState:
     """
     用户输入节点
@@ -22,10 +34,19 @@ def user_input_node(state: GraphState) -> GraphState:
     config = load_langgraph_config()
     node_config = config.get("langgraph", {}).get("nodes", {}).get("user_input", {})
 
-    # 清理用户输入：移除 OpenWebUI 添加的 "Tools Available" 信息
     user_query = state["user_query"]
 
-    # 查找 "#### Tools Available" 标记
+    # 优先检测 OpenWebUI 的 follow-up questions 请求（包含完整对话历史，通常很长）
+    # 这类请求无需处理，直接标记跳过，避免不必要的截断警告
+    if _is_followup_request(user_query):
+        logger.debug(f"检测到 follow-up questions 请求，长度: {len(user_query)}，将在 Router 中跳过")
+        # 不截断，保留原始内容让 Router 处理
+        state["current_node"] = "user_input"
+        state["errors"] = []
+        state["metadata"] = {"start_time": __import__("time").time(), "is_followup": True}
+        return state
+
+    # 清理用户输入：移除 OpenWebUI 添加的 "Tools Available" 信息
     tools_marker = "#### Tools Available"
     if tools_marker in user_query:
         # 只保留标记之前的内容
