@@ -123,10 +123,15 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
                 "执行失败", "错误", "Error", "失败", "Connection not available"
             ])
 
-            # 限制结果长度，但保留足够的信息供分析
-            max_result_len = 1500
-            if len(result_data) > max_result_len:
-                result_data = result_data[:max_result_len] + "\n... [数据已截断]"
+            # RAG 类工具不截断（这些工具返回的是精确检索结果，截断会导致信息丢失）
+            rag_tools = ["gemini.rag_search", "gemini.rag_list_stores", "gemini.rag_list_documents"]
+            is_rag_tool = any(rag in tool_name for rag in rag_tools)
+
+            if not is_rag_tool:
+                # 非 RAG 工具：限制结果长度
+                max_result_len = 3000
+                if len(result_data) > max_result_len:
+                    result_data = result_data[:max_result_len] + "\n... [数据已截断]"
 
             tool_results.append({
                 "tool": tool_name,

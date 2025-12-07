@@ -21,7 +21,7 @@ TRUNCATION_CONFIG = {
         "tail_length": 600,      # 网络工具的统计信息通常在结尾
     },
     "database": {
-        "max_length": 2000,
+        "max_length": 5000,
         "head_length": 800,
         "tail_length": 800,
     },

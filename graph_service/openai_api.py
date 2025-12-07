@@ -13,7 +13,7 @@ import json
 
 from .graph import compile_graph
 from .state import GraphState
-from .utils import smart_truncate, get_tool_type, extract_result_summary
+from .utils import extract_result_summary
 from utils import get_token_tracker
 
 
@@ -442,9 +442,8 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
                 action = last_record.get("action", {})
 
                 if observation:
-                    # 获取工具名称和类型
+                    # 获取工具名称
                     tool_name = action.get("tool", "") if isinstance(action, dict) else ""
-                    tool_type = get_tool_type(tool_name) if tool_name else "default"
 
                     # 尝试提取结构化摘要
                     summary = extract_result_summary(tool_name, observation) if tool_name else None
@@ -456,11 +455,9 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
                     if summary:
                         output += f"> 📌 **摘要**: {summary}\n\n"
 
-                    # 智能截断观察结果
-                    observation_display = smart_truncate(observation, tool_type)
-
+                    # 前端流式展示：不截断，显示完整结果
                     # 使用代码块包裹，保持格式
-                    output += f"```\n{observation_display}\n```\n\n"
+                    output += f"```\n{observation}\n```\n\n"
 
                     return output
             return ""
