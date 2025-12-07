@@ -628,6 +628,44 @@ def _llm_router(user_query: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _correct_tool_name(tool_name: str) -> str:
+    """
+    修正 LLM 可能生成的错误工具名称
+
+    LLM 可能错误地使用 agent 名称作为工具前缀（如 gemini_rag_agent.search）
+    需要转换为正确的工具前缀（如 gemini_rag.search）
+
+    Args:
+        tool_name: LLM 生成的工具名称
+
+    Returns:
+        修正后的工具名称
+    """
+    from utils import load_agent_mapping_config
+
+    # 加载 agent 映射配置
+    mapping_config = load_agent_mapping_config()
+    agents = mapping_config.get("agents", {})
+
+    # 构建 agent full_name -> tools_prefix 的映射
+    # 例如：gemini_rag_agent -> gemini_rag
+    agent_to_prefix = {}
+    for agent_key, agent_info in agents.items():
+        full_name = agent_info.get("full_name", "")
+        tools_prefix = agent_info.get("tools_prefix", "")
+        if full_name and tools_prefix:
+            agent_to_prefix[full_name] = tools_prefix
+
+    # 检查工具名称是否使用了 agent full_name 作为前缀
+    for agent_full_name, tools_prefix in agent_to_prefix.items():
+        # 检查是否以 agent_full_name. 开头（如 gemini_rag_agent.search）
+        if tool_name.startswith(f"{agent_full_name}."):
+            # 替换为正确的工具前缀（如 gemini_rag.search）
+            return tool_name.replace(f"{agent_full_name}.", f"{tools_prefix}.", 1)
+
+    return tool_name
+
+
 def _parse_llm_response(response: str) -> Optional[Dict[str, Any]]:
     """
     解析 LLM 响应，提取 Agent 执行计划和首次行动
@@ -669,6 +707,13 @@ def _parse_llm_response(response: str) -> Optional[Dict[str, Any]]:
         # 提取首次行动（如果有）
         first_action = data.get("first_action")
         if first_action:
+            tool_name = first_action.get("tool", "")
+            # 修正工具名称：LLM 可能错误地使用 agent 名称作为前缀（如 gemini_rag_agent.search）
+            # 需要转换为正确的工具前缀（如 gemini_rag.search）
+            corrected_tool_name = _correct_tool_name(tool_name)
+            if corrected_tool_name != tool_name:
+                logger.info(f"Router: 修正工具名称: {tool_name} -> {corrected_tool_name}")
+                first_action["tool"] = corrected_tool_name
             logger.info(f"Router: 解析出首次行动: {first_action.get('tool')}")
 
         return {

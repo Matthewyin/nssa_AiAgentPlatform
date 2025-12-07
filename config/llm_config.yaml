@@ -9,7 +9,7 @@ llm:
   provider: "deepseek"
 
   # 通用参数（所有 Provider 共用）
-  model: "deepseek-reasoner"
+  # model: "deepseek-reasoner"
   # model: "gemini-2.5-pro"
   # model: "deepseek-r1:8b"
   
@@ -43,10 +43,9 @@ providers:
   gemini:
     # 注意：API Key 请通过系统环境变量 GEMINI_API_KEY 提供
     api_key: "${GEMINI_API_KEY}"
-    model: "gemini-2.5-pro"
+    model: "gemini-2.5-flash"
     # Gemini 不需要 base_url，使用官方默认地址
-    # RAG 检索使用的模型（建议使用 flash 版本以节省成本）
-    rag_model: "gemini-2.5-flash"
+    # 注意：RAG 配置已移至独立的 gemini_rag 节（见文件末尾）
 
   # DeepSeek（OpenAI 兼容接口）
   deepseek:
@@ -55,6 +54,16 @@ providers:
     base_url: "${DEEPSEEK_BASE_URL}"
     # model: "deepseek-reasoner"
     model: "deepseek-chat"
+
+# Gemini RAG 专用配置（独立于 LLM provider）
+# 用于知识库检索，可以与主 LLM provider 不同
+gemini_rag:
+  # API Key 可以与 gemini provider 共用，也可以单独配置
+  api_key: "${GEMINI_API_KEY}"
+  # RAG 模型，建议使用 flash 版本以节省配额
+  # gemini-2.5-flash: 每分钟 15 次，每天 1500 次
+  # gemini-2.5-pro: 每分钟 5 次，每天 25 次（配额很低！）
+  model: "gemini-2.5-flash"
 
 # Embedding 配置（保持与之前兼容）
 embedding:

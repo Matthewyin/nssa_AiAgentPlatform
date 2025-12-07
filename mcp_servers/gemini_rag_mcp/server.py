@@ -24,23 +24,44 @@ def load_llm_config() -> Dict[str, Any]:
     content = template.safe_substitute(os.environ)
     return yaml.safe_load(content)
 
-def get_gemini_api_key() -> str:
-    """获取 Gemini API Key（复用 llm_config.yaml 配置）"""
+def get_gemini_rag_config() -> dict:
+    """
+    获取 Gemini RAG 独立配置
+
+    优先使用 llm_config.yaml 中的 gemini_rag 配置节
+    如果不存在，回退到 providers.gemini 配置
+    """
     config = load_llm_config()
-    api_key = config.get("providers", {}).get("gemini", {}).get("api_key", "")
+
+    # 优先使用独立的 gemini_rag 配置
+    rag_config = config.get("gemini_rag", {})
+    if rag_config:
+        return rag_config
+
+    # 回退到 providers.gemini 配置（兼容旧配置）
+    gemini_config = config.get("providers", {}).get("gemini", {})
+    return {
+        "api_key": gemini_config.get("api_key", ""),
+        "model": gemini_config.get("rag_model", "") or gemini_config.get("model", "gemini-2.5-flash")
+    }
+
+def get_gemini_api_key() -> str:
+    """获取 Gemini RAG API Key"""
+    rag_config = get_gemini_rag_config()
+    api_key = rag_config.get("api_key", "")
+
+    # 如果配置值是环境变量占位符，从环境变量读取
     if not api_key or api_key.startswith("${"):
         api_key = os.environ.get("GEMINI_API_KEY", "")
+
     if not api_key:
         raise ValueError("未配置 GEMINI_API_KEY，请在 .env 或环境变量中设置")
     return api_key
 
 def get_gemini_rag_model() -> str:
-    """获取 Gemini RAG 检索使用的模型（复用 llm_config.yaml 配置）"""
-    config = load_llm_config()
-    gemini_config = config.get("providers", {}).get("gemini", {})
-    # 优先使用 rag_model，否则回退到 model
-    rag_model = gemini_config.get("rag_model", "") or gemini_config.get("model", "gemini-2.5-flash")
-    return rag_model
+    """获取 Gemini RAG 检索使用的模型"""
+    rag_config = get_gemini_rag_config()
+    return rag_config.get("model", "gemini-2.5-flash")
 
 # 创建 MCP Server 实例
 app = Server("gemini-rag-mcp")
