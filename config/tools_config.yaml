@@ -276,18 +276,34 @@ tools:
           default: 100
       timeout: 30
 
-  # RAG工具 (后续扩展)
-  # rag:
-  #   search_cases:
-  #     name: "rag.search_cases"
-  #     description: "搜索历史案例"
-  #     parameters:
-  #       query:
-  #         type: "string"
-  #         description: "搜索关键词"
-  #         required: true
-  #       limit:
-  #         type: "integer"
-  #         description: "返回结果数量"
-  #         default: 5
-  #     timeout: 10
+  # Gemini RAG 工具
+  gemini_rag:
+    list_stores:
+      name: "gemini_rag.list_stores"
+      description: "列出所有 Gemini File Search Store（知识库）"
+      parameters: {}
+      timeout: 30
+
+    list_documents:
+      name: "gemini_rag.list_documents"
+      description: "列出指定知识库中的所有文档"
+      parameters:
+        store_name:
+          type: "string"
+          description: "知识库名称，如 fileSearchStores/xxx 或简短名称"
+          required: true
+      timeout: 30
+
+    search:
+      name: "gemini_rag.search"
+      description: "在指定知识库中进行 RAG 语义检索"
+      parameters:
+        store_name:
+          type: "string"
+          description: "知识库名称"
+          required: true
+        query:
+          type: "string"
+          description: "检索查询内容"
+          required: true
+      timeout: 60

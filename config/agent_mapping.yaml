@@ -24,15 +24,17 @@ agents:
     description: "MySQL 数据库查询专家"
     tools_prefix: "mysql"
   
-  # RAG Agent（暂未启用）
-  rag:
-    config_key: "rag"
-    full_name: "rag_agent"
+  # Gemini RAG Agent
+  gemini_rag:
+    config_key: "gemini_rag"
+    full_name: "gemini_rag_agent"
     short_names:
+      - "gemini_rag"
       - "rag"
       - "知识库"
-    description: "知识库检索专家"
-    tools_prefix: "rag"
+      - "文档"
+    description: "Gemini 知识库检索专家"
+    tools_prefix: "gemini_rag"
 
 # 默认 Agent
 default_agent: "network_agent"

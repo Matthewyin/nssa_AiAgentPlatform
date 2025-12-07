@@ -26,11 +26,13 @@ mcp_servers:
       MYSQL_DATABASE: "${MYSQL_DATABASE}"
       MYSQL_ALLOW_WRITE: "${MYSQL_ALLOW_WRITE}"
 
-  # RAG MCP Server (暂时注释,后续启用)
-  # - name: rag-mcp
-  #   command: python
-  #   args:
-  #     - "-m"
-  #     - "mcp_servers.rag_mcp.server"
-  #   tools_prefix: "rag"
-  #   description: "知识库检索工具集"
+  # Gemini RAG MCP Server
+  - name: gemini-rag-mcp
+    command: python
+    args:
+      - "-m"
+      - "mcp_servers.gemini_rag_mcp.server"
+    tools_prefix: "gemini_rag"
+    description: "Gemini 知识库检索工具集（基于 Gemini File Search API）"
+    env:
+      GEMINI_API_KEY: "${GEMINI_API_KEY}"

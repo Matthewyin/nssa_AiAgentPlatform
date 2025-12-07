@@ -15,6 +15,7 @@ NSSA AI Agent Platform 是一个面向企业运维场景的智能 Agent 平台�
 - 📊 **审计日志**：完整的工具调用追踪
 - 🔄 **配置热加载**：运行时动态更新配置
 - 🔌 **多 LLM Provider**：支持 Ollama/OpenAI/Gemini/DeepSeek
+- 📚 **Gemini RAG 集成**：基于 Gemini File Search API 的知识库检索
 
 ## 🏗️ 系统架构
 
@@ -37,7 +38,7 @@ flowchart TB
     subgraph "执行平面: MCP Servers"
         NetworkMCP["Network MCP<br/>ping / traceroute"]
         DatabaseMCP["Database MCP<br/>MySQL 查询"]
-        RAGMCP["RAG MCP<br/>知识库检索"]
+        GeminiRAGMCP["Gemini RAG MCP<br/>知识库检索"]
     end
 
     WebUI --> GraphService
@@ -49,7 +50,7 @@ flowchart TB
     ToolGateway --> AuditLogger
     ServerRegistry --> NetworkMCP
     ServerRegistry --> DatabaseMCP
-    ServerRegistry --> RAGMCP
+    ServerRegistry --> GeminiRAGMCP
 ```
 
 ### 架构说明
@@ -164,7 +165,7 @@ nssa_AiAgentPlatform/
 │   └── api.py                 # HTTP API
 ├── mcp_servers/                # MCP Server 实现
 │   ├── network_mcp/           # 网络诊断 MCP
-│   └── rag_mcp/               # RAG 检索 MCP
+│   └── gemini_rag_mcp/        # Gemini RAG 知识库检索 MCP
 ├── mcp_manager/                # MCP 客户端管理
 │   ├── client_manager.py      # 客户端管理器
 │   └── connection.py          # 连接管理

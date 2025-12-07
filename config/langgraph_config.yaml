@@ -18,8 +18,8 @@ langgraph:
         target_node: "network_agent"
       - keywords: ["数据库", "mysql", "查询", "表", "sql", "select", "database"]
         target_node: "database_agent"
-      - keywords: ["历史", "案例", "文档", "知识库"]
-        target_node: "rag_agent"
+      - keywords: ["知识库", "文档", "RAG", "检索", "搜索知识", "查找文档", "历史案例"]
+        target_node: "gemini_rag_agent"
     
     # 是否使用LLM作为后备路由
     use_llm_fallback: true
@@ -29,7 +29,7 @@ langgraph:
       根据用户的问题,判断应该使用哪个Agent:
       - network_agent: 处理网络诊断相关问题(ping, traceroute, DNS，MTR, TCP, HTTP, TLS 等)
       - database_agent: 处理数据库查询相关问题(MySQL查询、表结构查看等)
-      - rag_agent: 处理知识库检索和历史案例查询
+      - gemini_rag_agent: 处理知识库检索、文档查询、历史案例查询
 
       用户问题: {query}
 
@@ -51,8 +51,8 @@ langgraph:
       retry_on_error: true
       max_retries: 1
 
-    rag_agent:
-      timeout: 30
+    gemini_rag_agent:
+      timeout: 60
       retry_on_error: true
       max_retries: 1
       
