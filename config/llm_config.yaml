@@ -51,7 +51,8 @@ providers:
     # 注意：API Key 请通过系统环境变量 DEEPSEEK_API_KEY 提供
     api_key: "${DEEPSEEK_API_KEY}"
     base_url: "${DEEPSEEK_BASE_URL}"
-    model: "deepseek-reasoner"
+    # model: "deepseek-reasoner"
+    model: "deepseek-chat"
 
 # Embedding 配置（保持与之前兼容）
 embedding:

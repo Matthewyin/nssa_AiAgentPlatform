@@ -290,13 +290,35 @@ async def _stream_response(
         }
 
         yield f"data: {json.dumps(end_chunk)}\n\n"
+
+        # 结束 Token 统计并发送统计信息
+        token_stats = None
+        if token_tracker and request_id:
+            token_stats = token_tracker.end_request()
+
+        # 在 [DONE] 之前发送 Token 统计信息（作为特殊消息）
+        if token_stats and token_stats.get("total_input_tokens", 0) > 0:
+            stats_content = _format_token_stats(token_stats)
+            stats_chunk = {
+                "id": chat_id,
+                "object": "chat.completion.chunk",
+                "created": created_time,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {
+                            "content": stats_content
+                        },
+                        "finish_reason": None
+                    }
+                ]
+            }
+            yield f"data: {json.dumps(stats_chunk, ensure_ascii=False)}\n\n"
+
         yield "data: [DONE]\n\n"
 
         logger.info(f"流式响应完成，总长度: {len(accumulated_content)} 字符")
-
-        # 结束 Token 统计
-        if token_tracker and request_id:
-            token_tracker.end_request()
 
     except Exception as e:
         logger.error(f"流式响应生成失败: {e}")
@@ -323,6 +345,41 @@ async def _stream_response(
         }
         yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
+
+
+def _format_token_stats(stats: Dict[str, Any]) -> str:
+    """
+    格式化 Token 统计信息为可视化输出
+
+    Args:
+        stats: Token 统计字典
+
+    Returns:
+        格式化的 Markdown 文本
+    """
+    if not stats:
+        return ""
+
+    llm_calls = len(stats.get("llm_calls", []))
+    input_tokens = stats.get("total_input_tokens", 0)
+    output_tokens = stats.get("total_output_tokens", 0)
+    total_tokens = input_tokens + output_tokens
+    cost = stats.get("estimated_cost_usd", 0)
+
+    # 格式化为紧凑的统计信息
+    output = "\n\n---\n\n"
+    output += "<details>\n"
+    output += "<summary>📊 <b>Token 统计</b></summary>\n\n"
+    output += f"| 指标 | 数值 |\n"
+    output += f"|------|------|\n"
+    output += f"| LLM 调用次数 | {llm_calls} |\n"
+    output += f"| 输入 Token | {input_tokens:,} |\n"
+    output += f"| 输出 Token | {output_tokens:,} |\n"
+    output += f"| 总 Token | {total_tokens:,} |\n"
+    output += f"| 预估成本 | ${cost:.4f} |\n"
+    output += "\n</details>\n"
+
+    return output
 
 
 def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:

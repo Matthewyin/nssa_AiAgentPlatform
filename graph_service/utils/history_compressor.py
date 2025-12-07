@@ -23,44 +23,48 @@ def compress_execution_history(
 ) -> str:
     """
     压缩执行历史，减少 token 消耗
-    
+
     策略：
     1. 最近 N 步保留详细信息
     2. 历史步骤压缩为一句话摘要
-    
+
     Args:
         execution_history: 执行历史列表
         config: 截断配置（可选）
-    
+
     Returns:
         压缩后的历史描述字符串
     """
     if not execution_history:
         return ""
-    
+
     # 加载配置
     if config is None:
         config = load_truncation_config()
-    
+
+    total_steps = len(execution_history)
+
     if not config.get("enabled", True):
         # 如果禁用压缩，返回原始格式
-        return _format_full_history(execution_history)
-    
+        full_history = _format_full_history(execution_history)
+        logger.debug(f"历史压缩已禁用，返回完整历史: {total_steps} 步, {len(full_history)} 字符")
+        return full_history
+
     window_size = config.get("window_size", 3)
     summary_max_length = config.get("summary_max_length", 100)
-    
-    total_steps = len(execution_history)
-    
+
     if total_steps <= window_size:
         # 步骤数少于窗口大小，全部保留详细信息
-        return _format_detailed_history(execution_history, 0)
-    
+        detailed_history = _format_detailed_history(execution_history, 0)
+        logger.debug(f"历史压缩: 步骤数({total_steps}) ≤ 窗口({window_size})，保留全部详情: {len(detailed_history)} 字符")
+        return detailed_history
+
     # 分割历史：压缩部分 + 详细部分
     compressed_steps = execution_history[:-window_size]
     detailed_steps = execution_history[-window_size:]
-    
+
     history_desc = "\n\n执行历史:\n"
-    
+
     # 压缩部分
     if compressed_steps:
         history_desc += f"\n[历史摘要] 步骤 1-{len(compressed_steps)}:\n"
@@ -69,11 +73,24 @@ def compress_execution_history(
             summary = _generate_step_summary(record, summary_max_length)
             summaries.append(summary)
         history_desc += "  " + " → ".join(summaries) + "\n"
-    
+
     # 详细部分
     start_step = len(compressed_steps) + 1
     history_desc += _format_detailed_history(detailed_steps, start_step - 1)
-    
+
+    # 计算压缩效果并记录日志
+    original_history = _format_full_history(execution_history)
+    original_len = len(original_history)
+    compressed_len = len(history_desc)
+    savings_percent = (1 - compressed_len / original_len) * 100 if original_len > 0 else 0
+
+    logger.info(
+        f"历史压缩: {total_steps} 步 | "
+        f"压缩 {len(compressed_steps)} 步 + 详细 {len(detailed_steps)} 步 | "
+        f"原始 {original_len} → 压缩后 {compressed_len} 字符 | "
+        f"节省 {savings_percent:.1f}%"
+    )
+
     return history_desc
 
 

@@ -20,11 +20,12 @@ def _should_skip_llm_analysis(state: GraphState) -> bool:
     """
     判断是否应该跳过 LLM 综合分析
 
-    条件：
+    优化后的策略：
     1. 配置启用跳过功能
-    2. 执行步骤数 ≤ 阈值
-    3. 无错误
-    4. 非多 Agent 场景（或配置允许）
+    2. 没有错误
+    3. 单 Agent + 步骤数 ≤ 阈值：跳过
+    4. 多 Agent + 步骤数 ≤ 多Agent阈值：跳过（新增）
+    5. 步骤数 > 阈值：不跳过
 
     Args:
         state: 当前状态
@@ -40,7 +41,8 @@ def _should_skip_llm_analysis(state: GraphState) -> bool:
             return False
 
         step_threshold = skip_config.get("step_threshold", 2)
-        always_analyze_multi_agent = skip_config.get("always_analyze_multi_agent", True)
+        # 多 Agent 场景的步骤阈值（新增配置，默认为 3）
+        multi_agent_step_threshold = skip_config.get("multi_agent_step_threshold", 3)
         always_analyze_on_error = skip_config.get("always_analyze_on_error", True)
 
         execution_history = state.get("execution_history", [])
@@ -49,6 +51,7 @@ def _should_skip_llm_analysis(state: GraphState) -> bool:
         # 计算实际执行的工具数
         tool_calls = [r for r in execution_history if r.get("action", {}).get("type") == "TOOL"]
         tool_count = len(tool_calls)
+        agent_count = len(agent_plan or [])
 
         # 检查是否有错误
         has_error = False
@@ -59,23 +62,27 @@ def _should_skip_llm_analysis(state: GraphState) -> bool:
                     has_error = True
                     break
 
-        # 检查是否多 Agent 场景
-        is_multi_agent = always_analyze_multi_agent and len(agent_plan or []) > 1
-
         # 判断是否跳过
         if has_error:
             logger.info("Final Answer: 检测到错误，不跳过 LLM 分析")
             return False
 
-        if is_multi_agent:
-            logger.info("Final Answer: 多 Agent 场景，不跳过 LLM 分析")
-            return False
+        # 单 Agent 场景
+        if agent_count <= 1:
+            if tool_count <= step_threshold:
+                logger.info(f"Final Answer: 单 Agent 简单任务（{tool_count} 个工具 ≤ {step_threshold}），跳过 LLM 分析")
+                return True
+            else:
+                logger.info(f"Final Answer: 单 Agent 复杂任务（{tool_count} 个工具 > {step_threshold}），需要 LLM 分析")
+                return False
 
-        if tool_count <= step_threshold:
-            logger.info(f"Final Answer: 简单任务（{tool_count} 个工具 ≤ {step_threshold}），跳过 LLM 分析")
+        # 多 Agent 场景
+        if tool_count <= multi_agent_step_threshold:
+            logger.info(f"Final Answer: 多 Agent 简单任务（{agent_count} Agent, {tool_count} 个工具 ≤ {multi_agent_step_threshold}），跳过 LLM 分析")
             return True
-
-        return False
+        else:
+            logger.info(f"Final Answer: 多 Agent 复杂任务（{agent_count} Agent, {tool_count} 个工具 > {multi_agent_step_threshold}），需要 LLM 分析")
+            return False
 
     except Exception as e:
         logger.warning(f"判断是否跳过 LLM 分析失败: {e}")

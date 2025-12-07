@@ -23,10 +23,10 @@ optimization:
   # 1.3 简单任务跳过 Final Answer
   skip_final_analysis:
     enabled: true
-    # 步骤数阈值（≤ 此值时考虑跳过）
+    # 单 Agent 场景步骤数阈值（≤ 此值时跳过）
     step_threshold: 2
-    # 多 Agent 场景强制分析
-    always_analyze_multi_agent: true
+    # 多 Agent 场景步骤数阈值（≤ 此值时跳过）
+    multi_agent_step_threshold: 3
     # 有错误时强制分析
     always_analyze_on_error: true
   
