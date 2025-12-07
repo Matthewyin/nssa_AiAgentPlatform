@@ -182,7 +182,7 @@ async def chat_completions(request: ChatCompletionRequest):
             }
 
             # 结束 Token 统计
-            token_tracker.end_request(request_id)
+            token_tracker.end_request()
 
             logger.info("OpenAI API响应已构建,准备返回")
             return JSONResponse(content=response_data)
@@ -190,7 +190,7 @@ async def chat_completions(request: ChatCompletionRequest):
     except Exception as e:
         logger.error(f"OpenAI API处理失败: {e}")
         # 结束 Token 统计（即使出错也要记录）
-        token_tracker.end_request(request_id)
+        token_tracker.end_request()
         error_response = {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
@@ -296,14 +296,14 @@ async def _stream_response(
 
         # 结束 Token 统计
         if token_tracker and request_id:
-            token_tracker.end_request(request_id)
+            token_tracker.end_request()
 
     except Exception as e:
         logger.error(f"流式响应生成失败: {e}")
 
         # 结束 Token 统计（即使出错也要记录）
         if token_tracker and request_id:
-            token_tracker.end_request(request_id)
+            token_tracker.end_request()
 
         # 发送错误信息
         error_chunk = {

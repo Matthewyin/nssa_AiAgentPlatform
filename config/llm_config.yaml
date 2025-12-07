@@ -5,12 +5,12 @@
 llm:
   # 当前使用的 Provider，可选：ollama / openai / gemini / deepseek
   # provider: "ollama"
-  provider: "gemini"
-  # provider: "deepseek"
+  # provider: "gemini"
+  provider: "deepseek"
 
   # 通用参数（所有 Provider 共用）
-  # model: "deepseek-reasoner"
-  model: "gemini-2.5-pro"
+  model: "deepseek-reasoner"
+  # model: "gemini-2.5-pro"
   # model: "deepseek-r1:8b"
   
   # deepseek建议生成代码时为0，数据分析为1，
