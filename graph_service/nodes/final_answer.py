@@ -6,7 +6,7 @@ from typing import Dict, Any
 import json
 from loguru import logger
 from ..state import GraphState
-from ..utils import smart_truncate, get_tool_type, extract_result_summary
+from ..utils import smart_truncate, get_tool_type, extract_result_summary, format_full_result
 from utils import load_langgraph_config, get_config_manager
 
 
@@ -18,7 +18,7 @@ def get_llm():
 
 def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan: list = None) -> str:
     """
-    生成 LLM 综合分析
+    生成 LLM 综合分析 - 专注于分析工具返回的结果内容
 
     Args:
         user_query: 用户的原始问题
@@ -29,85 +29,82 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
         LLM 生成的综合分析
     """
     try:
-        # 构建执行摘要，包含实际的观察结果（特别是错误信息）
-        execution_summary = ""
+        # 提取工具执行的结果内容（不是执行步骤，而是实际返回的数据）
+        tool_results = []
         tool_calls = [record for record in execution_history if record.get("action", {}).get("type") == "TOOL"]
 
-        if tool_calls:
-            execution_summary += "执行步骤：\n"
-            for i, record in enumerate(tool_calls, 1):
-                action = record.get("action", {})
-                tool_name = action.get("tool", "")
-                observation = record.get("observation", "")
+        for record in tool_calls:
+            action = record.get("action", {})
+            tool_name = action.get("tool", "")
+            observation = record.get("observation", "")
 
-                # 提取工具执行结果的关键信息
-                result_summary = ""
-                if "执行失败" in observation or "错误" in observation or "Error" in observation:
-                    result_summary = "失败"
-                    # 提取错误详情（截取前300字符，确保 LLM 看到错误原因）
-                    error_detail = observation[:300]
-                    if len(observation) > 300:
-                        error_detail += "..."
-                    execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n   错误详情: {error_detail}\n"
-                elif "执行成功" in observation:
-                    result_summary = "成功"
-                    # 提取成功结果摘要（截取前200字符）
-                    result_detail = observation[:200]
-                    if len(observation) > 200:
-                        result_detail += "..."
-                    execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n   结果: {result_detail}\n"
-                else:
-                    result_summary = "完成"
-                    execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n"
+            # 提取实际的结果数据
+            result_data = observation
+            if "结果:" in observation:
+                result_data = observation.split("结果:", 1)[1].strip()
+            elif "结果：" in observation:
+                result_data = observation.split("结果：", 1)[1].strip()
 
-        # 构建多 Agent 信息
-        agent_info = ""
-        agent_type_desc = "分析专家"  # 默认描述
+            # 判断是否执行失败
+            is_error = any(err in observation for err in [
+                "执行失败", "错误", "Error", "失败", "Connection not available"
+            ])
 
-        if agent_plan and len(agent_plan) > 1:
-            agent_info = "\n多 Agent 协作：\n"
-            for i, plan in enumerate(agent_plan, 1):
-                agent_name = plan.get("agent", "")
-                task = plan.get("task", "")
-                agent_info += f"{i}. {agent_name}: {task}\n"
-            agent_type_desc = "多 Agent 协作分析专家"
-        elif agent_plan and len(agent_plan) == 1:
-            # 单 Agent 场景，根据 Agent 类型确定描述
+            # 限制结果长度，但保留足够的信息供分析
+            max_result_len = 1500
+            if len(result_data) > max_result_len:
+                result_data = result_data[:max_result_len] + "\n... [数据已截断]"
+
+            tool_results.append({
+                "tool": tool_name,
+                "result": result_data,
+                "is_error": is_error
+            })
+
+        # 构建结果内容
+        results_content = ""
+        if tool_results:
+            for i, tr in enumerate(tool_results, 1):
+                status = "❌ 失败" if tr["is_error"] else "✅ 成功"
+                results_content += f"\n【工具 {i}】{tr['tool']} - {status}\n"
+                results_content += f"返回数据:\n{tr['result']}\n"
+
+        # 确定分析专家类型
+        agent_type_desc = "数据分析专家"
+        if agent_plan and len(agent_plan) >= 1:
             agent_name = agent_plan[0].get("agent", "")
             if "network" in agent_name.lower():
-                agent_type_desc = "网络诊断分析专家"
+                agent_type_desc = "网络诊断专家"
             elif "database" in agent_name.lower():
-                agent_type_desc = "数据库查询分析专家"
+                agent_type_desc = "数据库分析专家"
             elif "rag" in agent_name.lower():
-                agent_type_desc = "知识库检索分析专家"
+                agent_type_desc = "知识检索专家"
 
-        # 构建 Prompt
-        prompt = f"""你是一个专业的{agent_type_desc}。请根据以下信息，生成一份综合分析报告。
+        # 构建 Prompt - 专注于分析结果内容
+        prompt = f"""你是一个专业的{agent_type_desc}。请根据以下工具返回的结果数据，进行分析并回答用户的问题。
 
-用户问题：
+## 用户问题
 {user_query}
-{agent_info}
-{execution_summary}
 
-请提供以下内容：
+## 工具执行结果
+{results_content}
 
-1. **任务完成情况**：简要说明任务是否完成，完成了哪些工作
-2. **关键发现**：从执行结果中提取关键信息和发现
-3. **问题诊断**：如果发现问题，进行诊断和分析
-4. **建议**：给出后续操作建议或优化建议
+## 分析要求
 
-【重要规则 - 禁止幻觉】：
-- 如果工具执行失败（如"MySQL Connection not available"），必须明确告知用户任务失败及原因
-- 绝对禁止在工具执行失败时编造虚假的查询结果或数据
-- 如果无法获取数据，直接说明"由于XXX原因，无法完成查询"
-- 只能基于实际的工具执行结果进行分析，不能假设或推测不存在的数据
+请基于上述工具返回的**实际数据**进行分析，提供以下内容：
 
-要求：
+1. **结果解读**：解释工具返回的数据含义
+2. **关键发现**：从数据中提取对用户问题有价值的信息
+3. **结论**：直接回答用户的问题
+4. **建议**（可选）：如果有优化或后续操作建议
+
+## 重要规则
+
+- **只分析实际返回的数据**，不要分析执行过程
+- **禁止编造数据**：如果工具执行失败，明确告知用户失败原因
+- **基于事实**：所有分析必须基于上述工具返回的实际数据
 - 使用中文回复
 - 简洁明了，重点突出
-- 使用 Markdown 格式
-- 如实报告错误和失败情况
-- 专注于分析和洞察
 
 请开始分析："""
 
@@ -362,54 +359,38 @@ def final_answer_node(state: GraphState) -> GraphState:
                 # 添加分隔线
                 final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-                # 添加执行过程详情（使用纯 Markdown 格式，默认展开）
-                final_answer += f"### 📋 执行过程详情（共 {len(execution_history)} 步）\n\n"
-                for i, record in enumerate(execution_history, 1):
-                    thought = record.get("thought", "")
-                    action = record.get("action", {})
-                    action_type = action.get("type", "")
-                    observation = record.get("observation", "")
+                # 添加完整执行结果（使用纯 Markdown 格式，默认展开）
+                # 只展示工具执行的结果，不展示思考过程（因为流式输出已展示）
+                tool_results = [
+                    record for record in execution_history
+                    if record.get("action", {}).get("type") == "TOOL" and record.get("observation")
+                ]
 
-                    # 使用 Markdown 格式展示每一步
-                    final_answer += f"#### 步骤 {i}\n\n"
+                if tool_results:
+                    final_answer += f"### 📋 完整执行结果（共 {len(tool_results)} 个工具）\n\n"
 
-                    # 展示思考过程
-                    if thought:
-                        final_answer += "**🤔 思考:**\n\n"
-                        final_answer += f"```\n{thought}\n```\n\n"
-
-                    # 展示行动
-                    if action_type == "TOOL":
+                    for i, record in enumerate(tool_results, 1):
+                        action = record.get("action", {})
                         tool_name = action.get("tool", "")
                         params = action.get("params", {})
-                        final_answer += "**🔧 行动:**\n\n"
-                        final_answer += f"- 工具: `{tool_name}`\n"
+                        observation = record.get("observation", "")
+
+                        # 工具标题
+                        final_answer += f"#### 🔧 {tool_name}\n\n"
+
+                        # 显示参数（简洁格式）
                         if params:
-                            params_json = json.dumps(params, ensure_ascii=False, indent=2)
-                            final_answer += f"- 参数:\n```json\n{params_json}\n```\n\n"
-                        else:
-                            final_answer += "\n"
-                    elif action_type == "FINISH":
-                        final_answer += "**✅ 行动:** 完成任务\n\n"
+                            params_display = ", ".join(f"`{k}={v}`" for k, v in params.items())
+                            final_answer += f"**参数**: {params_display}\n\n"
 
-                    # 展示观察结果
-                    if observation:
-                        # 获取工具名称和类型，使用智能截断
-                        obs_tool_name = action.get("tool", "") if isinstance(action, dict) else ""
-                        obs_tool_type = get_tool_type(obs_tool_name) if obs_tool_name else "default"
+                        # 显示完整结果（使用 Markdown 表格或代码块）
+                        final_answer += "**结果**:\n\n"
+                        formatted_result = format_full_result(tool_name, observation)
+                        final_answer += formatted_result
+                        final_answer += "\n\n"
 
-                        # 尝试提取结构化摘要
-                        summary = extract_result_summary(obs_tool_name, observation) if obs_tool_name else None
-
-                        final_answer += "**📊 观察:**\n\n"
-                        if summary:
-                            final_answer += f"> 📌 **摘要**: {summary}\n\n"
-
-                        # 使用智能截断
-                        observation_display = smart_truncate(observation, obs_tool_type)
-                        final_answer += f"```\n{observation_display}\n```\n\n"
-
-                    final_answer += "---\n\n"
+                        if i < len(tool_results):
+                            final_answer += "---\n\n"
 
                 # 添加 LLM 综合分析（使用纯 Markdown 格式）
                 try:

@@ -126,11 +126,11 @@ def extract_database_summary(result: Dict[str, Any]) -> str:
 def extract_result_summary(tool_name: str, observation: str) -> Optional[str]:
     """
     从观察结果中提取结构化摘要
-    
+
     Args:
         tool_name: 工具名称
         observation: 完整的观察结果
-        
+
     Returns:
         结构化摘要，如果无法提取则返回 None
     """
@@ -139,15 +139,163 @@ def extract_result_summary(tool_name: str, observation: str) -> Optional[str]:
         if "结果:" in observation:
             json_str = observation.split("结果:")[1].strip()
             result = json.loads(json_str)
-            
+
             # 根据工具类型提取摘要
             if "ping" in tool_name.lower():
                 return extract_ping_summary(result)
             elif "mysql" in tool_name.lower() or "sql" in tool_name.lower():
                 return extract_database_summary(result)
-        
+
         return None
     except Exception as e:
         logger.debug(f"提取结果摘要失败: {e}")
         return None
+
+
+def format_as_markdown_table(data: Any) -> str:
+    """
+    将数据格式化为 Markdown 表格
+
+    Args:
+        data: 数据，可以是列表、字典或字符串
+
+    Returns:
+        Markdown 格式的表格或代码块
+    """
+    try:
+        # 如果是字符串，尝试解析为 JSON
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError:
+                # 不是 JSON，直接返回代码块
+                return f"```\n{data}\n```"
+
+        # 处理列表数据（如数据库查询结果）
+        if isinstance(data, list):
+            if not data:
+                return "*无数据*"
+
+            # 检查是否是元组列表（如 MySQL 返回的原始结果）
+            if isinstance(data[0], (tuple, list)):
+                # 没有列名，生成默认列名
+                num_cols = len(data[0])
+                headers = [f"列{i+1}" for i in range(num_cols)]
+                rows = data
+            elif isinstance(data[0], dict):
+                # 字典列表，提取列名
+                headers = list(data[0].keys())
+                rows = [[str(row.get(h, "")) for h in headers] for row in data]
+            else:
+                # 简单列表
+                return f"```\n{json.dumps(data, ensure_ascii=False, indent=2)}\n```"
+
+            # 生成 Markdown 表格
+            table = "| " + " | ".join(str(h) for h in headers) + " |\n"
+            table += "| " + " | ".join(["---"] * len(headers)) + " |\n"
+            for row in rows:
+                if isinstance(row, (tuple, list)):
+                    table += "| " + " | ".join(str(cell) if cell is not None else "" for cell in row) + " |\n"
+                else:
+                    table += f"| {row} |\n"
+
+            return table
+
+        # 处理字典数据
+        if isinstance(data, dict):
+            # 检查是否有 mermaid 流程图
+            if "mermaid" in data or "flowchart" in data or "graph" in data:
+                mermaid_code = data.get("mermaid") or data.get("flowchart") or data.get("graph")
+                if mermaid_code:
+                    return f"```mermaid\n{mermaid_code}\n```"
+
+            # 普通字典，格式化为键值对表格
+            table = "| 字段 | 值 |\n"
+            table += "| --- | --- |\n"
+            for key, value in data.items():
+                value_str = str(value) if not isinstance(value, (dict, list)) else json.dumps(value, ensure_ascii=False)
+                # 截断过长的值
+                if len(value_str) > 100:
+                    value_str = value_str[:100] + "..."
+                table += f"| {key} | {value_str} |\n"
+            return table
+
+        # 其他类型，直接转字符串
+        return f"```\n{str(data)}\n```"
+
+    except Exception as e:
+        logger.debug(f"格式化为 Markdown 表格失败: {e}")
+        return f"```\n{str(data)}\n```"
+
+
+def _try_parse_python_literal(text: str) -> Any:
+    """
+    尝试解析 Python 字面量（如元组列表）
+
+    Args:
+        text: 可能是 Python 字面量的字符串
+
+    Returns:
+        解析后的 Python 对象，或 None 如果解析失败
+    """
+    import ast
+    try:
+        # 使用 ast.literal_eval 安全地解析 Python 字面量
+        return ast.literal_eval(text.strip())
+    except (ValueError, SyntaxError):
+        return None
+
+
+def format_full_result(tool_name: str, observation: str) -> str:
+    """
+    格式化完整的工具执行结果
+
+    Args:
+        tool_name: 工具名称
+        observation: 完整的观察结果
+
+    Returns:
+        格式化后的 Markdown 内容
+    """
+    try:
+        # 尝试从观察结果中提取结果数据
+        result_data = None
+        result_str = ""
+
+        if "结果:" in observation:
+            result_str = observation.split("结果:", 1)[1].strip()
+        elif "结果：" in observation:
+            result_str = observation.split("结果：", 1)[1].strip()
+        else:
+            result_str = observation.strip()
+
+        # 尝试多种方式解析
+        # 1. 尝试 JSON 解析
+        try:
+            result_data = json.loads(result_str)
+        except json.JSONDecodeError:
+            # 2. 尝试 Python 字面量解析（处理元组列表等）
+            result_data = _try_parse_python_literal(result_str)
+
+            if result_data is None:
+                # 3. 无法解析，使用原始字符串
+                result_data = result_str
+
+        # 根据工具类型选择格式化方式
+        tool_type = get_tool_type(tool_name)
+
+        if tool_type == "database":
+            # 数据库结果使用表格
+            return format_as_markdown_table(result_data)
+        else:
+            # 其他结果，检查是否可以格式化
+            if isinstance(result_data, (dict, list)):
+                return format_as_markdown_table(result_data)
+            else:
+                # 纯文本结果
+                return f"```\n{result_data}\n```"
+
+    except Exception as e:
+        logger.debug(f"格式化完整结果失败: {e}")
+        return f"```\n{observation}\n```"
 
