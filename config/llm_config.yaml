@@ -5,15 +5,20 @@
 llm:
   # 当前使用的 Provider，可选：ollama / openai / gemini / deepseek
   # provider: "ollama"
-  # provider: "gemini"
-  provider: "deepseek"
+  provider: "gemini"
+  # provider: "deepseek"
 
   # 通用参数（所有 Provider 共用）
-  model: "deepseek-reasoner"
-  # model: "gemini-2.5-pro"
+  # model: "deepseek-reasoner"
+  model: "gemini-2.5-pro"
   # model: "deepseek-r1:8b"
-  temperature: 0.7
-  max_tokens: 8000
+  
+  # deepseek建议生成代码时为0，数据分析为1，
+  # temperature: 1 
+
+  # 其他大模型温度设置
+  temperature: 1
+  max_tokens: 10240
   timeout: 120
 
   # Provider 通用字段（由下方 providers.* 预设或这里覆盖）

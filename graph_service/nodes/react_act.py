@@ -130,13 +130,33 @@ async def react_act_node(state: GraphState) -> GraphState:
                     else:
                         result_str = json.dumps(result, ensure_ascii=False, indent=2)
 
-                    logger.info(f"工具执行成功: {tool_name}")
-                    logger.debug(f"工具结果:\n{result_str[:500]}...")
+                    # 检测工具返回结果中是否包含错误信息
+                    # 这些错误来自工具内部（如数据库连接失败），虽然工具调用成功，但实际执行失败
+                    error_indicators = [
+                        "Error executing tool",
+                        "Connection not available",
+                        "connection refused",
+                        "Access denied",
+                        "Unknown database",
+                        "Table doesn't exist",
+                        "Syntax error",
+                    ]
+                    result_lower = result_str.lower()
+                    has_error = any(indicator.lower() in result_lower for indicator in error_indicators)
 
-                    # 保存观察结果
-                    state["last_observation"] = (
-                        f"工具 {tool_name} 执行成功。结果:\n{result_str}"
-                    )
+                    if has_error:
+                        # 工具调用成功但返回错误结果
+                        logger.warning(f"工具 {tool_name} 返回错误结果: {result_str[:200]}")
+                        state["last_observation"] = (
+                            f"工具 {tool_name} 执行失败。错误信息:\n{result_str}"
+                        )
+                    else:
+                        logger.info(f"工具执行成功: {tool_name}")
+                        logger.debug(f"工具结果:\n{result_str[:500]}...")
+                        # 保存观察结果
+                        state["last_observation"] = (
+                            f"工具 {tool_name} 执行成功。结果:\n{result_str}"
+                        )
                 elif call_result.status == ToolCallStatus.PERMISSION_DENIED:
                     error_msg = f"权限不足: {call_result.error}"
                     logger.error(error_msg)

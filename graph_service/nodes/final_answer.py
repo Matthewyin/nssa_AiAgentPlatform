@@ -29,7 +29,7 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
         LLM 生成的综合分析
     """
     try:
-        # 构建执行摘要
+        # 构建执行摘要，包含实际的观察结果（特别是错误信息）
         execution_summary = ""
         tool_calls = [record for record in execution_history if record.get("action", {}).get("type") == "TOOL"]
 
@@ -42,14 +42,23 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
 
                 # 提取工具执行结果的关键信息
                 result_summary = ""
-                if "执行成功" in observation:
-                    result_summary = "成功"
-                elif "执行失败" in observation or "错误" in observation:
+                if "执行失败" in observation or "错误" in observation or "Error" in observation:
                     result_summary = "失败"
+                    # 提取错误详情（截取前300字符，确保 LLM 看到错误原因）
+                    error_detail = observation[:300]
+                    if len(observation) > 300:
+                        error_detail += "..."
+                    execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n   错误详情: {error_detail}\n"
+                elif "执行成功" in observation:
+                    result_summary = "成功"
+                    # 提取成功结果摘要（截取前200字符）
+                    result_detail = observation[:200]
+                    if len(observation) > 200:
+                        result_detail += "..."
+                    execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n   结果: {result_detail}\n"
                 else:
                     result_summary = "完成"
-
-                execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n"
+                    execution_summary += f"{i}. 使用工具 {tool_name} - {result_summary}\n"
 
         # 构建多 Agent 信息
         agent_info = ""
@@ -87,11 +96,17 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
 3. **问题诊断**：如果发现问题，进行诊断和分析
 4. **建议**：给出后续操作建议或优化建议
 
+【重要规则 - 禁止幻觉】：
+- 如果工具执行失败（如"MySQL Connection not available"），必须明确告知用户任务失败及原因
+- 绝对禁止在工具执行失败时编造虚假的查询结果或数据
+- 如果无法获取数据，直接说明"由于XXX原因，无法完成查询"
+- 只能基于实际的工具执行结果进行分析，不能假设或推测不存在的数据
+
 要求：
 - 使用中文回复
 - 简洁明了，重点突出
 - 使用 Markdown 格式
-- 不要重复执行过程的详细信息
+- 如实报告错误和失败情况
 - 专注于分析和洞察
 
 请开始分析："""

@@ -27,7 +27,7 @@ langgraph:
     # LLM路由的Prompt
     llm_router_prompt: |
       根据用户的问题,判断应该使用哪个Agent:
-      - network_agent: 处理网络诊断相关问题(ping, traceroute, DNS等)
+      - network_agent: 处理网络诊断相关问题(ping, traceroute, DNS，MTR, TCP, HTTP, TLS 等)
       - database_agent: 处理数据库查询相关问题(MySQL查询、表结构查看等)
       - rag_agent: 处理知识库检索和历史案例查询
 

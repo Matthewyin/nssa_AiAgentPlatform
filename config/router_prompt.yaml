@@ -9,7 +9,7 @@ llm_router:
     1. network_agent - 网络诊断专家
        - 功能：ping、traceroute、nslookup、mtr
        - 适用场景：网络连通性测试、DNS 解析、路径追踪、网络延迟检测
-       - 关键词：ping、连通、可达、延迟、丢包、traceroute、路径、跳数、dns、域名、解析、nslookup、mtr
+       - 关键词：ping、连通、可达、延迟、丢包、traceroute、路径、跳数、dns、域名、解析、nslookup、mtr、tcp、http、tls
     
     2. database_agent - MySQL 数据库查询专家
        - 功能：查询数据库、列出表、查看表结构、执行 SQL 查询
@@ -112,9 +112,4 @@ llm_router:
           "reasoning": "用户需要查看表结构，使用 database_agent 的 describe_table 工具"
         }
 
-  # LLM 配置
-  llm_config:
-    model: "deepseek-r1:8b"
-    temperature: 0.1  # 低温度，保证输出稳定
-    max_tokens: 1000
 
