@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from loguru import logger
 from ..state import GraphState
-from utils import load_langgraph_config, load_router_prompt_config, settings, get_config_manager
+from utils import load_langgraph_config, load_router_prompt_config, settings, get_config_manager, load_optimization_config
 
 
 def router_node(state: GraphState) -> GraphState:
@@ -33,28 +33,70 @@ def router_node(state: GraphState) -> GraphState:
         state["final_answer"] = '{"follow_ups": []}'
         return state
 
-    # 路由优先级：
-    # 1. 手动路由（@agent 语法）
-    # 2. 工作流模板匹配
-    # 3. LLM 自动路由
+    # 加载优化配置
+    opt_config = _load_skip_router_config()
 
-    # 优先检查手动路由（@agent 语法）
-    agent_plan = _parse_manual_routing(user_query)
+    # 检查路由缓存
+    from utils.query_cache import get_query_cache
+    query_cache = get_query_cache()
+    cached_router = query_cache.get_router_cache(user_query)
 
-    if agent_plan:
-        # 使用手动路由
-        logger.info(f"Router: 使用手动路由")
+    if cached_router:
+        agent_plan = cached_router.get("agent_plan")
+        first_action = cached_router.get("first_action")
+        routing_method = "缓存"
+        logger.info(f"Router: 使用缓存的路由结果")
     else:
-        # 检查工作流模板匹配
-        agent_plan = _match_workflow_template(user_query)
+        # 路由优先级：
+        # 1. 手动路由（@agent 语法）
+        # 2. 工作流模板匹配
+        # 3. 规则引擎关键词匹配（新增）
+        # 4. LLM 自动路由
 
-        if agent_plan:
-            # 使用工作流模板
-            logger.info(f"Router: 使用工作流模板")
-        else:
-            # 使用 LLM 路由
+        # 优先检查手动路由（@agent 语法）
+        agent_plan = None
+        routing_method = None
+        first_action = None
+
+        if opt_config.get("skip_on_manual_routing", True):
+            agent_plan = _parse_manual_routing(user_query)
+            if agent_plan:
+                routing_method = "手动路由"
+                logger.info(f"Router: 使用手动路由（跳过 LLM）")
+
+        # 检查工作流模板匹配
+        if not agent_plan and opt_config.get("skip_on_workflow_template", True):
+            agent_plan = _match_workflow_template(user_query)
+            if agent_plan:
+                routing_method = "工作流模板"
+                logger.info(f"Router: 使用工作流模板（跳过 LLM）")
+
+        # 规则引擎关键词匹配（新增）
+        if not agent_plan and opt_config.get("skip_on_keyword_match", True):
+            agent_plan = _keyword_router(user_query)
+            if agent_plan:
+                routing_method = "规则引擎"
+                logger.info(f"Router: 使用规则引擎关键词匹配（跳过 LLM）")
+
+        # LLM 自动路由（兜底）
+        if not agent_plan:
             logger.info(f"Router: 使用 LLM 自动路由")
-            agent_plan = _llm_router(user_query)
+            llm_result = _llm_router(user_query)
+            if llm_result:
+                agent_plan = llm_result.get("agent_plan")
+                first_action = llm_result.get("first_action")
+
+                # 缓存 LLM 路由结果
+                query_cache.set_router_cache(user_query, {
+                    "agent_plan": agent_plan,
+                    "first_action": first_action
+                })
+            routing_method = "LLM"
+
+    # 记录路由方法到 state
+    if "metadata" not in state:
+        state["metadata"] = {}
+    state["metadata"]["routing_method"] = routing_method
 
     if agent_plan and len(agent_plan) > 0:
         # 设置 agent_plan
@@ -73,7 +115,130 @@ def router_node(state: GraphState) -> GraphState:
     # 初始化 ReAct 状态
     _initialize_react_state(state)
 
+    # 自适应 Think 深度：根据任务复杂度调整 max_iterations
+    from ..utils.complexity_analyzer import analyze_complexity
+    complexity, max_iterations = analyze_complexity(user_query, agent_plan)
+    state["max_iterations"] = max_iterations
+    state["metadata"]["task_complexity"] = complexity
+    logger.info(f"Router: 任务复杂度={complexity}, max_iterations={max_iterations}")
+
+    # 如果有首次行动决策，设置到 state 中（跳过首次 Think）
+    if first_action and first_action.get("tool"):
+        logger.info(f"Router: 设置首次行动决策: {first_action.get('tool')}")
+        state["next_action"] = {
+            "action_type": "TOOL",
+            "tool_name": first_action.get("tool"),
+            "params": first_action.get("params", {}),
+            "thought": first_action.get("thought", "")
+        }
+        state["metadata"]["skip_first_think"] = True
+
     return state
+
+
+def _load_skip_router_config() -> Dict[str, Any]:
+    """
+    加载跳过 LLM Router 的配置
+
+    Returns:
+        配置字典
+    """
+    try:
+        config = load_optimization_config()
+        return config.get("optimization", {}).get("skip_llm_router", {})
+    except Exception as e:
+        logger.warning(f"加载跳过 Router 配置失败: {e}")
+        return {"enabled": True, "skip_on_manual_routing": True, "skip_on_workflow_template": True, "skip_on_keyword_match": True}
+
+
+def _keyword_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    规则引擎关键词路由（增强版）
+
+    根据 langgraph_config.yaml 中的 keyword_rules 进行匹配
+    支持置信度评估：匹配多个关键词时置信度更高
+
+    Args:
+        user_query: 用户问题
+
+    Returns:
+        Agent 执行计划列表，如果没有匹配则返回 None
+    """
+    try:
+        # 加载配置
+        config = load_langgraph_config()
+        router_config = config.get("langgraph", {}).get("router", {})
+        keyword_rules = router_config.get("keyword_rules", [])
+
+        # 加载意图分类配置
+        opt_config = load_optimization_config()
+        intent_config = opt_config.get("optimization", {}).get("intent_classification", {})
+        confidence_threshold = intent_config.get("rule_confidence_threshold", 0.5)
+
+        query_lower = user_query.lower()
+
+        # 计算每个规则的匹配分数
+        best_match = None
+        best_score = 0.0
+
+        for rule in keyword_rules:
+            keywords = rule.get("keywords", [])
+            target_node = rule.get("target_node", "")
+            exclude_keywords = rule.get("exclude_keywords", [])
+            priority = rule.get("priority", 1)
+
+            # 检查排除关键词
+            excluded = False
+            for exclude_kw in exclude_keywords:
+                if exclude_kw.lower() in query_lower:
+                    excluded = True
+                    break
+
+            if excluded:
+                continue
+
+            # 计算匹配分数
+            matched_keywords = []
+            for keyword in keywords:
+                if keyword.lower() in query_lower:
+                    matched_keywords.append(keyword)
+
+            if matched_keywords:
+                # 分数 = 匹配关键词数 / 总关键词数 * 优先级
+                score = (len(matched_keywords) / len(keywords)) * priority
+
+                if score > best_score:
+                    best_score = score
+                    best_match = {
+                        "target_node": target_node,
+                        "matched_keywords": matched_keywords,
+                        "score": score
+                    }
+
+        # 检查是否达到置信度阈值
+        if best_match and best_score >= confidence_threshold:
+            logger.info(
+                f"Router: 规则引擎匹配 -> {best_match['target_node']} "
+                f"(关键词: {best_match['matched_keywords']}, 置信度: {best_score:.2f})"
+            )
+
+            return [{
+                "name": best_match["target_node"],
+                "task": user_query,
+                "status": "pending"
+            }]
+
+        if best_match:
+            logger.info(
+                f"Router: 规则引擎匹配置信度不足 "
+                f"({best_score:.2f} < {confidence_threshold})，回退到 LLM"
+            )
+
+        return None
+
+    except Exception as e:
+        logger.warning(f"规则引擎路由失败: {e}")
+        return None
 
 
 def _load_workflow_templates() -> Dict[str, Any]:
@@ -342,7 +507,51 @@ def _build_dynamic_system_prompt() -> str:
 """
     system_prompt += "\n".join(agent_descriptions)
 
-    system_prompt += """
+    # 检查是否启用 Router + Think 合并
+    from utils import load_optimization_config
+    opt_config = load_optimization_config()
+    merge_config = opt_config.get("optimization", {}).get("router_think_merge", {})
+    include_first_action = merge_config.get("enabled", False) and merge_config.get("include_first_action", True)
+
+    if include_first_action:
+        # 合并模式：同时输出路由决策和首次行动
+        system_prompt += """
+你的任务：
+1. 分析用户的问题
+2. 判断需要使用哪些 Agent
+3. 如果需要多个 Agent，确定执行顺序
+4. 为每个 Agent 提取具体的任务描述
+5. 为第一个 Agent 规划首次行动（使用哪个工具、参数是什么）
+
+返回格式（必须是有效的 JSON）：
+{
+  "agents": [
+    {
+      "name": "agent_name",
+      "task": "具体任务描述"
+    }
+  ],
+  "first_action": {
+    "thought": "首次行动的思考过程",
+    "tool": "工具名称（如 network.ping, mysql.execute_query）",
+    "params": {
+      "参数名": "参数值"
+    }
+  },
+  "reasoning": "你的分析过程"
+}
+
+注意事项：
+1. 如果问题只需要一个 Agent，agents 数组只包含一个元素
+2. 如果问题需要多个 Agent 协作，按照执行顺序排列
+3. 每个 Agent 的 task 应该清晰具体，包含必要的参数信息
+4. 如果问题中提到了具体的数据（如域名、IP、表名），要在 task 中包含
+5. first_action 是第一个 Agent 的首次工具调用，必须包含 thought、tool、params
+6. 必须返回有效的 JSON 格式，不要包含其他文本
+"""
+    else:
+        # 原有模式：只输出路由决策
+        system_prompt += """
 你的任务：
 1. 分析用户的问题
 2. 判断需要使用哪些 Agent
@@ -371,7 +580,7 @@ def _build_dynamic_system_prompt() -> str:
     return system_prompt
 
 
-def _llm_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
+def _llm_router(user_query: str) -> Optional[Dict[str, Any]]:
     """
     使用 LLM 进行路由决策
 
@@ -379,7 +588,7 @@ def _llm_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
         user_query: 用户问题
 
     Returns:
-        Agent 执行计划列表，格式: [{"name": "agent_name", "task": "任务描述", "status": "pending"}]
+        包含 agent_plan 和 first_action 的字典
     """
     try:
         # 动态构建 system_prompt
@@ -396,36 +605,38 @@ def _llm_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
         user_prompt = user_prompt_template.format(user_query=user_query)
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
-        # 调用 LLM（使用配置管理器）
+        # 调用 LLM（使用配置管理器 + token 统计）
+        from utils.llm_wrapper import invoke_llm_with_tracking
+
         config_manager = get_config_manager()
         llm = config_manager.get_llm("router")
 
         logger.info(f"Router: 调用 LLM 进行路由决策...")
-        response = llm.invoke(full_prompt)
+        response = invoke_llm_with_tracking(llm, full_prompt, "router")
 
         # 从 AIMessage 对象中提取文本内容
         response_text = response.content if hasattr(response, 'content') else str(response)
         logger.info(f"Router: LLM 响应: {response_text[:200]}...")
 
         # 解析 LLM 响应
-        agent_plan = _parse_llm_response(response_text)
+        result = _parse_llm_response(response_text)
 
-        return agent_plan
+        return result
 
     except Exception as e:
         logger.error(f"Router: LLM 路由失败: {e}")
         return None
 
 
-def _parse_llm_response(response: str) -> Optional[List[Dict[str, Any]]]:
+def _parse_llm_response(response: str) -> Optional[Dict[str, Any]]:
     """
-    解析 LLM 响应，提取 Agent 执行计划
+    解析 LLM 响应，提取 Agent 执行计划和首次行动
 
     Args:
         response: LLM 响应文本
 
     Returns:
-        Agent 执行计划列表
+        包含 agent_plan 和 first_action 的字典
     """
     try:
         # 尝试提取 JSON（可能被包裹在其他文本中）
@@ -454,7 +665,16 @@ def _parse_llm_response(response: str) -> Optional[List[Dict[str, Any]]]:
             })
 
         logger.info(f"Router: 解析出 {len(agent_plan)} 个 Agent")
-        return agent_plan
+
+        # 提取首次行动（如果有）
+        first_action = data.get("first_action")
+        if first_action:
+            logger.info(f"Router: 解析出首次行动: {first_action.get('tool')}")
+
+        return {
+            "agent_plan": agent_plan,
+            "first_action": first_action
+        }
 
     except json.JSONDecodeError as e:
         logger.error(f"Router: 解析 LLM 响应失败（JSON 格式错误）: {e}")

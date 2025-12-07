@@ -175,5 +175,10 @@ def load_agent_mapping_config() -> Dict[str, Any]:
     return load_yaml_config(get_config_dir() / "agent_mapping.yaml")
 
 
+def load_optimization_config() -> Dict[str, Any]:
+    """加载优化配置"""
+    return load_yaml_config(get_config_dir() / "optimization_config.yaml")
+
+
 # 全局配置实例
 settings = Settings()

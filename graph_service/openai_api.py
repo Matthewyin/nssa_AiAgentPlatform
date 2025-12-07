@@ -2,6 +2,7 @@
 OpenAI兼容的API接口
 用于集成OpenWebUI
 """
+import uuid
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ import json
 from .graph import compile_graph
 from .state import GraphState
 from .utils import smart_truncate, get_tool_type, extract_result_summary
+from utils import get_token_tracker
 
 
 router = APIRouter()
@@ -116,6 +118,11 @@ async def chat_completions(request: ChatCompletionRequest):
 
         logger.info(f"OpenAI API收到请求: {user_message[:100]}...")
 
+        # 开始 Token 统计
+        request_id = str(uuid.uuid4())[:8]
+        token_tracker = get_token_tracker()
+        token_tracker.start_request(request_id, user_message)
+
         # 初始化状态
         initial_state: GraphState = {
             "user_query": user_message,
@@ -135,7 +142,7 @@ async def chat_completions(request: ChatCompletionRequest):
             # 流式响应 - 使用 astream() 实时返回
             logger.info("使用流式模式执行图")
             return StreamingResponse(
-                _stream_response(graph_instance, initial_state, request.model),
+                _stream_response(graph_instance, initial_state, request.model, request_id, token_tracker),
                 media_type="text/event-stream"
             )
         else:
@@ -173,11 +180,17 @@ async def chat_completions(request: ChatCompletionRequest):
                     "total_tokens": len(user_message.split()) + len(response_text.split())
                 }
             }
+
+            # 结束 Token 统计
+            token_tracker.end_request(request_id)
+
             logger.info("OpenAI API响应已构建,准备返回")
             return JSONResponse(content=response_data)
 
     except Exception as e:
         logger.error(f"OpenAI API处理失败: {e}")
+        # 结束 Token 统计（即使出错也要记录）
+        token_tracker.end_request(request_id)
         error_response = {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
@@ -198,7 +211,13 @@ async def chat_completions(request: ChatCompletionRequest):
         return JSONResponse(content=error_response)
 
 
-async def _stream_response(graph, initial_state: GraphState, model: str) -> AsyncIterator[str]:
+async def _stream_response(
+    graph,
+    initial_state: GraphState,
+    model: str,
+    request_id: str = None,
+    token_tracker = None
+) -> AsyncIterator[str]:
     """
     生成流式响应
 
@@ -206,6 +225,8 @@ async def _stream_response(graph, initial_state: GraphState, model: str) -> Asyn
         graph: LangGraph 图实例
         initial_state: 初始状态
         model: 模型名称
+        request_id: 请求 ID（用于 token 统计）
+        token_tracker: Token 统计器
 
     Yields:
         SSE格式的数据块
@@ -273,8 +294,17 @@ async def _stream_response(graph, initial_state: GraphState, model: str) -> Asyn
 
         logger.info(f"流式响应完成，总长度: {len(accumulated_content)} 字符")
 
+        # 结束 Token 统计
+        if token_tracker and request_id:
+            token_tracker.end_request(request_id)
+
     except Exception as e:
         logger.error(f"流式响应生成失败: {e}")
+
+        # 结束 Token 统计（即使出错也要记录）
+        if token_tracker and request_id:
+            token_tracker.end_request(request_id)
+
         # 发送错误信息
         error_chunk = {
             "id": f"chatcmpl-{int(time.time())}",

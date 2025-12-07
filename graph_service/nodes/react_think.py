@@ -5,7 +5,7 @@ ReAct Think Node
 from typing import Dict, Any
 from loguru import logger
 from ..state import GraphState
-from ..utils import smart_truncate, get_tool_type, extract_result_summary
+from ..utils import smart_truncate, get_tool_type, extract_result_summary, compress_execution_history
 from utils import get_config_manager, load_agent_config
 import re
 import json
@@ -89,41 +89,59 @@ def build_think_prompt(state: GraphState, available_tools: list) -> str:
         for tool in available_tools
     ])
 
-    # 执行历史 - 使用智能截断，保留开头和结尾的关键信息
+    # 执行历史 - 使用压缩历史，减少 token 消耗
     history_desc = ""
     if state.get("execution_history"):
-        history_desc = "\n\n执行历史:\n"
-        for i, record in enumerate(state["execution_history"], 1):
-            history_desc += f"\n步骤 {i}:\n"
-            history_desc += f"  思考: {record.get('thought', 'N/A')}\n"
-            history_desc += f"  行动: {record.get('action', 'N/A')}\n"
-
-            # 获取观察结果，使用智能截断
-            observation = record.get('observation', 'N/A')
-            action = record.get('action', {})
-            tool_name = action.get('tool', '') if isinstance(action, dict) else ''
-
-            # 尝试提取结构化摘要
-            summary = extract_result_summary(tool_name, observation) if tool_name else None
-
-            if summary:
-                # 如果能提取摘要，显示摘要 + 智能截断的详情
-                tool_type = get_tool_type(tool_name)
-                truncated_obs = smart_truncate(observation, tool_type)
-                history_desc += f"  摘要: {summary}\n"
-                history_desc += f"  观察: {truncated_obs}\n"
-            else:
-                # 使用智能截断
-                tool_type = get_tool_type(tool_name) if tool_name else "default"
-                truncated_obs = smart_truncate(observation, tool_type)
-                history_desc += f"  观察: {truncated_obs}\n"
+        history_desc = compress_execution_history(state["execution_history"])
 
     # 上一步观察
     last_obs = state.get("last_observation", "")
     last_obs_desc = f"\n\n上一步观察结果:\n{last_obs}\n" if last_obs else ""
 
+    # 检查是否启用批量规划
+    from utils import load_optimization_config
+    opt_config = load_optimization_config()
+    batch_config = opt_config.get("optimization", {}).get("batch_planning", {})
+    batch_enabled = batch_config.get("enabled", False)
+    max_batch_size = batch_config.get("max_batch_size", 5)
+
     # 构建完整 prompt
-    prompt = f"""{system_prompt}
+    if batch_enabled:
+        # 批量规划模式
+        prompt = f"""{system_prompt}
+
+用户问题: {user_query}
+
+可用工具:
+{tools_desc}
+{history_desc}{last_obs_desc}
+
+请按照以下格式输出（支持批量规划多个工具）:
+
+THOUGHT: [你的思考过程，分析当前情况和需要做什么]
+ACTION: [TOOL 或 FINISH]
+
+如果 ACTION 是 TOOL，可以规划多个工具（最多 {max_batch_size} 个）:
+TOOL_1: [第一个工具名称]
+PARAMS_1: [第一个工具的 JSON 参数]
+TOOL_2: [第二个工具名称（可选）]
+PARAMS_2: [第二个工具的 JSON 参数（可选）]
+...
+
+或者只规划一个工具:
+TOOL: [工具名称]
+PARAMS: [JSON 参数]
+
+重要提示:
+1. 如果需要使用前面步骤的结果（如 IP 地址），请从"上一步观察结果"中提取
+2. 只有相互独立的工具才能批量规划，有依赖关系的工具需要分步执行
+3. 如果任务已完成，ACTION 设为 FINISH
+4. PARAMS 必须是有效的 JSON 格式
+
+现在请开始分析并输出你的决策:"""
+    else:
+        # 单工具模式（默认）
+        prompt = f"""{system_prompt}
 
 用户问题: {user_query}
 
@@ -306,6 +324,43 @@ def parse_llm_output(output: str, tools_prefix: str = None) -> Dict[str, Any]:
                 result["action_type"] = "FINISH"
                 logger.warning(f"无法解析 ACTION 且无工具名，默认为 FINISH。请检查 LLM 输出格式。")
 
+    # 尝试解析批量工具（TOOL_1, PARAMS_1, TOOL_2, PARAMS_2, ...）
+    batch_tools = []
+    for i in range(1, 10):  # 最多支持 9 个批量工具
+        tool_pattern = rf'TOOL_{i}:\s*([a-zA-Z_][a-zA-Z0-9_.]*)'
+        params_pattern = rf'PARAMS_{i}:\s*(\{{.+?\}})(?=\n[A-Z]|\nTOOL_|\n\n|$)'
+
+        tool_match = re.search(tool_pattern, output, re.IGNORECASE)
+        if tool_match:
+            tool_name = tool_match.group(1).strip()
+            params = {}
+
+            params_match = re.search(params_pattern, output, re.DOTALL | re.IGNORECASE)
+            if params_match:
+                try:
+                    params = json.loads(params_match.group(1))
+                except json.JSONDecodeError:
+                    pass
+
+            # 自动补全工具名称前缀
+            if tools_prefix:
+                tool_name = _ensure_tool_prefix(tool_name, tools_prefix)
+
+            batch_tools.append({
+                "tool_name": tool_name,
+                "params": params
+            })
+        else:
+            break
+
+    # 如果解析到批量工具，存储到结果中
+    if batch_tools:
+        result["action_type"] = "TOOL"
+        result["tool_name"] = batch_tools[0]["tool_name"]
+        result["params"] = batch_tools[0]["params"]
+        result["batch_tools"] = batch_tools  # 存储所有批量工具
+        logger.info(f"解析到 {len(batch_tools)} 个批量工具: {[t['tool_name'] for t in batch_tools]}")
+
     logger.debug(f"最终解析结果: action_type={result['action_type']}, tool={result['tool_name']}, params={result['params']}")
     return result
 
@@ -354,6 +409,29 @@ async def react_think_node(state: GraphState) -> GraphState:
     state["current_node"] = "react_think"
 
     try:
+        # 检查是否跳过首次 Think（Router + Think 合并优化）
+        metadata = state.get("metadata", {})
+        if metadata.get("skip_first_think") and state.get("next_action"):
+            logger.info("ReAct Think: 跳过首次 Think（使用 Router 的首次行动决策）")
+            # 清除标记，下次不再跳过
+            state["metadata"]["skip_first_think"] = False
+            return state
+
+        # 检查工具队列（批量规划优化）
+        tool_queue = state.get("tool_queue", [])
+        if tool_queue:
+            # 从队列中取出下一个工具
+            next_tool = tool_queue.pop(0)
+            state["tool_queue"] = tool_queue
+            state["next_action"] = {
+                "action_type": "TOOL",
+                "tool_name": next_tool["tool_name"],
+                "params": next_tool.get("params", {}),
+                "thought": f"批量规划: 执行队列中的工具 {next_tool['tool_name']}"
+            }
+            logger.info(f"ReAct Think: 使用队列中的工具 {next_tool['tool_name']}（剩余 {len(tool_queue)} 个）")
+            return state
+
         # 检查是否达到最大迭代次数
         if state["current_step"] >= state["max_iterations"]:
             logger.warning(f"达到最大迭代次数: {state['max_iterations']}")
@@ -389,10 +467,12 @@ async def react_think_node(state: GraphState) -> GraphState:
         # 构建 Prompt
         prompt = build_think_prompt(state, available_tools)
 
-        # 调用 LLM
+        # 调用 LLM（使用 token 统计）
+        from utils.llm_wrapper import invoke_llm_with_tracking
+
         logger.info(f"ReAct Think - 步骤 {state['current_step']}")
         llm = get_llm()
-        llm_output = llm.invoke(prompt)
+        llm_output = invoke_llm_with_tracking(llm, prompt, "react_think")
 
         # 从 AIMessage 对象中提取文本内容
         llm_output_text = llm_output.content if hasattr(llm_output, 'content') else str(llm_output)
@@ -403,6 +483,27 @@ async def react_think_node(state: GraphState) -> GraphState:
 
         logger.info(f"解析结果: action_type={parsed['action_type']}, tool={parsed.get('tool_name')}")
 
+        # 结果质量验证
+        from utils import load_optimization_config
+        opt_config = load_optimization_config()
+        validation_config = opt_config.get("optimization", {}).get("result_validation", {})
+
+        if validation_config.get("enabled", False):
+            from ..utils.result_validator import validate_think_output
+
+            # 获取可用工具名称列表
+            available_tool_names = [t["name"] for t in available_tools]
+
+            is_valid, errors = validate_think_output(parsed, available_tool_names)
+
+            if not is_valid:
+                logger.warning(f"ReAct Think 输出验证失败: {errors}")
+                # 如果是幻觉（工具不存在），尝试修正
+                if any("不存在" in e for e in errors):
+                    logger.warning("检测到工具幻觉，标记为 FINISH")
+                    parsed["action_type"] = "FINISH"
+                    parsed["thought"] = f"工具验证失败: {errors}"
+
         # 保存决策
         state["next_action"] = {
             "action_type": parsed["action_type"],
@@ -410,6 +511,13 @@ async def react_think_node(state: GraphState) -> GraphState:
             "params": parsed.get("params", {}),
             "thought": parsed.get("thought", "")
         }
+
+        # 如果有批量工具，存储到工具队列中
+        batch_tools = parsed.get("batch_tools", [])
+        if batch_tools and len(batch_tools) > 1:
+            # 第一个工具已经在 next_action 中，剩余的存入队列
+            state["tool_queue"] = batch_tools[1:]
+            logger.info(f"批量规划: 当前执行 {batch_tools[0]['tool_name']}，队列中还有 {len(batch_tools) - 1} 个工具")
 
         # 如果决定 FINISH，标记为完成
         if parsed["action_type"] == "FINISH":

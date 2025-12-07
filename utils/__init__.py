@@ -11,8 +11,11 @@ from .config_loader import (
     load_langgraph_config,
     load_router_prompt_config,
     load_agent_mapping_config,
+    load_optimization_config,
 )
 from .config_manager import get_config_manager, ConfigManager
+from .token_tracker import get_token_tracker, TokenTracker
+from .query_cache import get_query_cache, QueryCache
 
 # watchdog 是可选依赖，仅在需要配置热加载时使用
 try:
@@ -38,8 +41,13 @@ __all__ = [
     "load_langgraph_config",
     "load_router_prompt_config",
     "load_agent_mapping_config",
+    "load_optimization_config",
     "get_config_manager",
     "ConfigManager",
     "start_config_watcher",
     "stop_config_watcher",
+    "get_token_tracker",
+    "TokenTracker",
+    "get_query_cache",
+    "QueryCache",
 ]

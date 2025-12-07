@@ -1,0 +1,118 @@
+# LLM 成本优化配置
+optimization:
+  # ============ Phase 1: 基础优化 ============
+  
+  # 1.1 执行历史智能截断
+  history_truncation:
+    enabled: true
+    # 保留详细信息的最近步数
+    window_size: 3
+    # 每步摘要最大字符数
+    summary_max_length: 100
+    # 是否启用历史压缩
+    enable_compression: true
+  
+  # 1.2 手动路由跳过 LLM
+  skip_llm_router:
+    enabled: true
+    # 跳过条件
+    skip_on_manual_routing: true      # @agent 语法
+    skip_on_workflow_template: true   # 工作流模板匹配
+    skip_on_keyword_match: true       # 规则引擎关键词匹配
+  
+  # 1.3 简单任务跳过 Final Answer
+  skip_final_analysis:
+    enabled: true
+    # 步骤数阈值（≤ 此值时考虑跳过）
+    step_threshold: 2
+    # 多 Agent 场景强制分析
+    always_analyze_multi_agent: true
+    # 有错误时强制分析
+    always_analyze_on_error: true
+  
+  # 1.4 Token 使用统计
+  token_tracking:
+    enabled: true
+    # 存储方式: memory, file, database
+    storage: file
+    # 日志文件路径（storage=file 时生效）
+    log_file: "data/logs/token_usage.log"
+    # 是否记录详细信息（prompt 内容等）
+    verbose: false
+    # 成本估算（每 1M tokens 的价格，单位 USD）
+    pricing:
+      gpt-4o:
+        input: 5.0
+        output: 15.0
+      gpt-4o-mini:
+        input: 0.15
+        output: 0.6
+      deepseek-chat:
+        input: 0.14
+        output: 0.28
+      deepseek-reasoner:
+        input: 0.55
+        output: 2.19
+      gemini-2.0-flash:
+        input: 0.0
+        output: 0.0
+      default:
+        input: 1.0
+        output: 3.0
+
+  # ============ Phase 2: 中等复杂度优化 ============
+
+  # 2.1 Router + 首次 Think 合并
+  router_think_merge:
+    enabled: true
+    # 是否在路由时同时输出首次行动
+    include_first_action: true
+  
+  # 2.2 意图分类预处理
+  intent_classification:
+    enabled: true
+    # 规则引擎置信度阈值（0-1，越高越严格）
+    rule_confidence_threshold: 0.5
+    # 使用小模型分类（暂未实现）
+    use_small_model: false
+  
+  # 2.3 结果质量验证
+  result_validation:
+    enabled: true
+    # 格式验证失败时最大重试次数
+    max_retries: 1
+    # 启用幻觉检测
+    detect_hallucination: true
+
+  # ============ Phase 3: 高复杂度优化 ============
+  
+  # 3.1 相同问题缓存
+  query_cache:
+    enabled: true
+    # 路由缓存 TTL（秒）
+    router_cache_ttl: 3600
+    # 结果缓存 TTL（秒）
+    result_cache_ttl: 300
+    # 存储方式: memory, redis
+    storage: memory
+  
+  # 3.2 多工具批量规划
+  batch_planning:
+    enabled: true
+    # 最大批量工具数
+    max_batch_size: 5
+    # 是否检测工具依赖
+    detect_dependencies: true
+  
+  # 3.3 自适应 Think 深度
+  adaptive_depth:
+    enabled: true
+    # 低复杂度任务的最大迭代次数
+    low_complexity_max_iterations: 3
+    # 中复杂度任务的最大迭代次数
+    medium_complexity_max_iterations: 6
+    # 高复杂度任务的最大迭代次数
+    high_complexity_max_iterations: 10
+    # 循环检测：连续相同决策的阈值
+    loop_detection_threshold: 2
+

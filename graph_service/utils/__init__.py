@@ -11,6 +11,16 @@ from .result_summarizer import (
     format_full_result,
     TRUNCATION_CONFIG,
 )
+from .history_compressor import (
+    compress_execution_history,
+    load_truncation_config,
+)
+from .result_validator import (
+    validate_router_response,
+    validate_think_output,
+    validate_tool_params,
+)
+from .complexity_analyzer import analyze_complexity
 
 __all__ = [
     "smart_truncate",
@@ -21,5 +31,11 @@ __all__ = [
     "format_as_markdown_table",
     "format_full_result",
     "TRUNCATION_CONFIG",
+    "compress_execution_history",
+    "load_truncation_config",
+    "validate_router_response",
+    "validate_think_output",
+    "validate_tool_params",
+    "analyze_complexity",
 ]
 

@@ -7,13 +7,79 @@ import json
 from loguru import logger
 from ..state import GraphState
 from ..utils import smart_truncate, get_tool_type, extract_result_summary, format_full_result
-from utils import load_langgraph_config, get_config_manager
+from utils import load_langgraph_config, get_config_manager, load_optimization_config
 
 
 def get_llm():
     """获取或创建 LLM 实例（使用配置管理器）"""
     config_manager = get_config_manager()
     return config_manager.get_llm("final_answer")
+
+
+def _should_skip_llm_analysis(state: GraphState) -> bool:
+    """
+    判断是否应该跳过 LLM 综合分析
+
+    条件：
+    1. 配置启用跳过功能
+    2. 执行步骤数 ≤ 阈值
+    3. 无错误
+    4. 非多 Agent 场景（或配置允许）
+
+    Args:
+        state: 当前状态
+
+    Returns:
+        是否跳过 LLM 分析
+    """
+    try:
+        config = load_optimization_config()
+        skip_config = config.get("optimization", {}).get("skip_final_analysis", {})
+
+        if not skip_config.get("enabled", False):
+            return False
+
+        step_threshold = skip_config.get("step_threshold", 2)
+        always_analyze_multi_agent = skip_config.get("always_analyze_multi_agent", True)
+        always_analyze_on_error = skip_config.get("always_analyze_on_error", True)
+
+        execution_history = state.get("execution_history", [])
+        agent_plan = state.get("agent_plan", [])
+
+        # 计算实际执行的工具数
+        tool_calls = [r for r in execution_history if r.get("action", {}).get("type") == "TOOL"]
+        tool_count = len(tool_calls)
+
+        # 检查是否有错误
+        has_error = False
+        if always_analyze_on_error:
+            for record in tool_calls:
+                observation = record.get("observation", "")
+                if any(err in str(observation) for err in ["Error", "错误", "失败", "failed", "exception"]):
+                    has_error = True
+                    break
+
+        # 检查是否多 Agent 场景
+        is_multi_agent = always_analyze_multi_agent and len(agent_plan or []) > 1
+
+        # 判断是否跳过
+        if has_error:
+            logger.info("Final Answer: 检测到错误，不跳过 LLM 分析")
+            return False
+
+        if is_multi_agent:
+            logger.info("Final Answer: 多 Agent 场景，不跳过 LLM 分析")
+            return False
+
+        if tool_count <= step_threshold:
+            logger.info(f"Final Answer: 简单任务（{tool_count} 个工具 ≤ {step_threshold}），跳过 LLM 分析")
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.warning(f"判断是否跳过 LLM 分析失败: {e}")
+        return False
 
 
 def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan: list = None) -> str:
@@ -108,9 +174,11 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
 
 请开始分析："""
 
-        # 调用 LLM
+        # 调用 LLM（使用 token 统计）
+        from utils.llm_wrapper import invoke_llm_with_tracking
+
         llm = get_llm()
-        analysis = llm.invoke(prompt)
+        analysis = invoke_llm_with_tracking(llm, prompt, "final_answer")
 
         # 从 AIMessage 对象中提取文本内容
         analysis_text = analysis.content if hasattr(analysis, 'content') else str(analysis)
@@ -393,18 +461,22 @@ def final_answer_node(state: GraphState) -> GraphState:
                             final_answer += "---\n\n"
 
                 # 添加 LLM 综合分析（使用纯 Markdown 格式）
-                try:
-                    user_query = state.get("user_query", "")
-                    agent_plan = state.get("agent_plan", [])
+                # 检查是否应该跳过 LLM 分析（简单任务优化）
+                if _should_skip_llm_analysis(state):
+                    logger.info("Final Answer: 跳过 LLM 综合分析（简单任务优化）")
+                else:
+                    try:
+                        user_query = state.get("user_query", "")
+                        agent_plan = state.get("agent_plan", [])
 
-                    llm_analysis = _generate_llm_analysis(user_query, execution_history, agent_plan)
+                        llm_analysis = _generate_llm_analysis(user_query, execution_history, agent_plan)
 
-                    if llm_analysis:
-                        final_answer += "### 💡 综合分析\n\n"
-                        final_answer += llm_analysis
-                        final_answer += "\n\n"
-                except Exception as e:
-                    logger.error(f"生成 LLM 分析时出错: {e}")
+                        if llm_analysis:
+                            final_answer += "### 💡 综合分析\n\n"
+                            final_answer += llm_analysis
+                            final_answer += "\n\n"
+                    except Exception as e:
+                        logger.error(f"生成 LLM 分析时出错: {e}")
 
         # 向后兼容：处理旧模式的 network_diag_result
         elif state.get("network_diag_result"):
