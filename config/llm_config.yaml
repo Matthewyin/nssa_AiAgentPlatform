@@ -45,6 +45,8 @@ providers:
     api_key: "${GEMINI_API_KEY}"
     model: "gemini-2.5-pro"
     # Gemini 不需要 base_url，使用官方默认地址
+    # RAG 检索使用的模型（建议使用 flash 版本以节省成本）
+    rag_model: "gemini-2.5-flash"
 
   # DeepSeek（OpenAI 兼容接口）
   deepseek:

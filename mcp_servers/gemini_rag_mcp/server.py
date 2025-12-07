@@ -34,6 +34,14 @@ def get_gemini_api_key() -> str:
         raise ValueError("未配置 GEMINI_API_KEY，请在 .env 或环境变量中设置")
     return api_key
 
+def get_gemini_rag_model() -> str:
+    """获取 Gemini RAG 检索使用的模型（复用 llm_config.yaml 配置）"""
+    config = load_llm_config()
+    gemini_config = config.get("providers", {}).get("gemini", {})
+    # 优先使用 rag_model，否则回退到 model
+    rag_model = gemini_config.get("rag_model", "") or gemini_config.get("model", "gemini-2.5-flash")
+    return rag_model
+
 # 创建 MCP Server 实例
 app = Server("gemini-rag-mcp")
 
@@ -140,8 +148,10 @@ async def _search(store_name: str, query: str) -> str:
             store_name = f"fileSearchStores/{store_name}"
 
         # 使用 file_search 工具进行 RAG 检索
+        rag_model = get_gemini_rag_model()
+        logger.info(f"使用模型 {rag_model} 进行 RAG 检索")
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=rag_model,
             contents=query,
             config=types.GenerateContentConfig(
                 tools=[
