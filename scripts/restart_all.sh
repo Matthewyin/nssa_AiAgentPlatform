@@ -16,8 +16,10 @@ if [ ! -f ".env" ]; then
     echo "请编辑.env文件配置环境变量"
 fi
 
-# 创建日志目录
-mkdir -p data/logs
+# 创建日志目录（分类存储）
+mkdir -p data/logs/app
+mkdir -p data/logs/graph_service
+mkdir -p data/logs/token_usage
 
 # 检查 uv 是否安装
 if ! command -v uv &> /dev/null; then
@@ -80,7 +82,8 @@ echo "步骤 2/2: 启动服务..."
 
 # 使用 uv run 启动 Graph Service
 echo "  启动 Graph Service (后台运行)..."
-nohup uv run python -m graph_service.main > data/logs/graph_service.log 2>&1 &
+TODAY=$(date +%Y-%m-%d)
+nohup uv run python -m graph_service.main > data/logs/graph_service/graph_service_${TODAY}.log 2>&1 &
 GRAPH_PID=$!
 
 # 保存PID到文件
@@ -94,16 +97,18 @@ if ps -p $GRAPH_PID > /dev/null; then
     echo ""
     echo "✅ Graph Service 重启成功！"
     echo "   PID: $GRAPH_PID"
-    echo "   日志文件: data/logs/graph_service.log"
-    echo "   应用日志: data/logs/app.log"
+    echo "   日志目录: data/logs/"
+    echo "   - 应用日志: data/logs/app/"
+    echo "   - 服务日志: data/logs/graph_service/"
+    echo "   - Token统计: data/logs/token_usage/"
     echo "   API文档: http://localhost:30021/docs"
     echo ""
-    echo "查看实时日志: tail -f data/logs/app.log"
+    echo "查看实时日志: tail -f data/logs/app/app_${TODAY}.log"
     echo "停止服务: bash scripts/stop_all.sh"
 else
     echo ""
     echo "❌ Graph Service 启动失败"
-    echo "请查看日志: cat data/logs/graph_service.log"
+    echo "请查看日志: cat data/logs/graph_service/graph_service_${TODAY}.log"
     exit 1
 fi
 

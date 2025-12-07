@@ -35,8 +35,7 @@ optimization:
     enabled: true
     # 存储方式: memory, file, database
     storage: file
-    # 日志文件路径（storage=file 时生效）
-    log_file: "data/logs/token_usage.log"
+    # 日志路径已移至 config/logging_config.yaml 统一管理
     # 是否记录详细信息（prompt 内容等）
     verbose: false
     # 成本估算（每 1M tokens 的价格，单位 USD）

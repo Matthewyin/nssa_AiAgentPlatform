@@ -1,5 +1,5 @@
 """工具模块"""
-from .logger import setup_logger, get_logger
+from .logger import setup_logger, get_logger, get_log_file_path, load_logging_config
 from .config_loader import (
     settings,
     load_yaml_config,
@@ -31,6 +31,8 @@ except ImportError:
 __all__ = [
     "setup_logger",
     "get_logger",
+    "get_log_file_path",
+    "load_logging_config",
     "settings",
     "load_yaml_config",
     "load_mcp_config",

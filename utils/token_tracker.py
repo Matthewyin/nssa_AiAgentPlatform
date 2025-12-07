@@ -40,22 +40,28 @@ class TokenTracker:
     def _load_config(self):
         """加载配置"""
         try:
-            from utils import load_optimization_config
+            from utils import load_optimization_config, load_logging_config
             config = load_optimization_config()
             self._config = config.get("optimization", {}).get("token_tracking", {})
-            
+
             if not self._config.get("enabled", False):
                 return
-            
-            # 设置日志文件
-            log_file = self._config.get("log_file", "data/logs/token_usage.log")
-            self._log_file = Path(log_file)
-            self._log_file.parent.mkdir(parents=True, exist_ok=True)
-            
+
+            # 从 logging_config.yaml 获取 token_usage 日志目录
+            logging_config = load_logging_config()
+            token_config = logging_config.get("logging", {}).get("categories", {}).get("token_usage", {})
+            base_dir = Path(logging_config.get("logging", {}).get("base_dir", "data/logs"))
+            token_dir = base_dir / token_config.get("dir", "token_usage")
+            token_dir.mkdir(parents=True, exist_ok=True)
+
+            # 使用日期格式的文件名
+            today = datetime.now().strftime("%Y-%m-%d")
+            self._log_file = token_dir / f"token_usage_{today}.log"
+
             # 加载定价
             self._pricing = self._config.get("pricing", {})
-            
-            logger.info(f"Token 统计已启用，日志文件: {self._log_file}")
+
+            logger.info(f"Token 统计已启用，日志目录: {token_dir}")
         except Exception as e:
             logger.warning(f"加载 Token 统计配置失败: {e}")
             self._config = {"enabled": False}
@@ -122,10 +128,13 @@ class TokenTracker:
             self._current_request["estimated_cost_usd"], 6
         )
         
-        # 写入日志文件
+        # 写入日志文件（使用当前日期的文件）
         if self._log_file:
             try:
-                with open(self._log_file, "a", encoding="utf-8") as f:
+                # 确保使用当前日期的文件（支持跨天）
+                today = datetime.now().strftime("%Y-%m-%d")
+                log_file = self._log_file.parent / f"token_usage_{today}.log"
+                with open(log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(self._current_request, ensure_ascii=False) + "\n")
             except Exception as e:
                 logger.warning(f"写入 Token 统计日志失败: {e}")
