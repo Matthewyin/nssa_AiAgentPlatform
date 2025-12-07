@@ -161,6 +161,12 @@ class McpStdioConnection:
             else:
                 result = ""
 
+            # 检查 isError 标志
+            if response.isError:
+                logger.warning(f"工具返回错误: {tool_name}, 错误内容: {result[:200]}")
+                # 返回带有错误标记的结果，让上层处理
+                return f"Error executing tool {tool_name}: {result}"
+
             logger.info(f"工具调用成功: {tool_name}")
             return result
 
