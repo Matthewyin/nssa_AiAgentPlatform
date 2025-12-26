@@ -43,7 +43,7 @@ providers:
   gemini:
     # 注意：API Key 请通过系统环境变量 GEMINI_API_KEY 提供
     api_key: "${GEMINI_API_KEY}"
-    model: "gemini-2.5-flash"
+    model: "gemini-3-flash-preview"
     # Gemini 不需要 base_url，使用官方默认地址
     # 注意：RAG 配置已移至独立的 gemini_rag 节（见文件末尾）
 
@@ -52,8 +52,8 @@ providers:
     # 注意：API Key 请通过系统环境变量 DEEPSEEK_API_KEY 提供
     api_key: "${DEEPSEEK_API_KEY}"
     base_url: "${DEEPSEEK_BASE_URL}"
-    model: "deepseek-reasoner"
-    # model: "deepseek-chat"
+    # model: "deepseek-reasoner"
+    model: "deepseek-chat"
 
 # Gemini RAG 专用配置（独立于 LLM provider）
 # 用于知识库检索，可以与主 LLM provider 不同
@@ -63,7 +63,7 @@ gemini_rag:
   # RAG 模型，建议使用 flash 版本以节省配额
   # gemini-2.5-flash: 每分钟 15 次，每天 1500 次
   # gemini-2.5-pro: 每分钟 5 次，每天 25 次（配额很低！）
-  model: "gemini-2.5-flash"
+  model: "gemini-3-pro-preview"
 
 # Embedding 配置（保持与之前兼容）
 embedding:

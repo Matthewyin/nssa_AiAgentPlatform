@@ -169,7 +169,7 @@ def format_as_markdown_table(data: Any) -> str:
                 data = json.loads(data)
             except json.JSONDecodeError:
                 # 不是 JSON，直接返回代码块
-                return f"```\n{data}\n```"
+                return f"```text\n{data}\n```"
 
         # 处理列表数据（如数据库查询结果）
         if isinstance(data, list):
@@ -221,11 +221,11 @@ def format_as_markdown_table(data: Any) -> str:
             return table
 
         # 其他类型，直接转字符串
-        return f"```\n{str(data)}\n```"
+        return f"```text\n{str(data)}\n```"
 
     except Exception as e:
         logger.debug(f"格式化为 Markdown 表格失败: {e}")
-        return f"```\n{str(data)}\n```"
+        return f"```text\n{str(data)}\n```"
 
 
 def _try_parse_python_literal(text: str) -> Any:
@@ -239,7 +239,26 @@ def _try_parse_python_literal(text: str) -> Any:
         解析后的 Python 对象，或 None 如果解析失败
     """
     import ast
+    import re
     try:
+        # 预处理：将 datetime.date 等对象转换为字符串，使 ast.literal_eval 可以解析
+        # 替换 datetime.date(2024, 8, 9) -> '2024-08-09'
+        def replace_date(match):
+            try:
+                args = match.group(1).split(",")
+                args = [int(a.strip()) for a in args]
+                if len(args) == 3:
+                     return f"'{args[0]}-{args[1]:02d}-{args[2]:02d}'"
+            except:
+                pass
+            return match.group(0)
+
+        # 匹配 datetime.date(Y, M, D)
+        text = re.sub(r'datetime\.date\((.*?)\)', replace_date, text)
+        
+        # 替换 datetime.datetime(...) -> 简单的字符串表示
+        text = re.sub(r'datetime\.datetime\((.*?)\)', r"'datetime(\1)'", text)
+
         # 使用 ast.literal_eval 安全地解析 Python 字面量
         return ast.literal_eval(text.strip())
     except (ValueError, SyntaxError):
@@ -293,9 +312,9 @@ def format_full_result(tool_name: str, observation: str) -> str:
                 return format_as_markdown_table(result_data)
             else:
                 # 纯文本结果
-                return f"```\n{result_data}\n```"
+                return f"```text\n{result_data}\n```"
 
     except Exception as e:
         logger.debug(f"格式化完整结果失败: {e}")
-        return f"```\n{observation}\n```"
+        return f"```text\n{observation}\n```"
 

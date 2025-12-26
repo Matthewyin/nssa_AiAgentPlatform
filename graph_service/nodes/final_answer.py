@@ -143,7 +143,7 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
         results_content = ""
         if tool_results:
             for i, tr in enumerate(tool_results, 1):
-                status = "❌ 失败" if tr["is_error"] else "✅ 成功"
+                status = "失败" if tr["is_error"] else "✅ 成功"
                 results_content += f"\n【工具 {i}】{tr['tool']} - {status}\n"
                 results_content += f"返回数据:\n{tr['result']}\n"
 
@@ -213,19 +213,29 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
     Returns:
         格式化后的三段式文本
     """
+    # 尝试解析JSON结果
     try:
-        # 解析JSON结果
         result = json.loads(result_json)
+        # 如果是 JSON，重新格式化以提升可读性
+        formatted_raw = json.dumps(result, ensure_ascii=False, indent=2)
+        lang = "json"
     except json.JSONDecodeError:
-        # 如果不是JSON，直接返回原始结果
-        return f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 工具: {tool_name}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📝 原始输出:
-{result_json}
-"""
+        # 如果不是标准 JSON，尝试检测是否为 Python 列表/元组字符串（常见于 SQL 结果）
+        import re
+        if result_json.strip().startswith("[") and "), (" in result_json:
+            # 针对 Python List[Tuple] 结构的简单格式化：在元组之间插入换行
+            formatted_raw = result_json.replace("), (", "),\n  (")
+            # 如果开头是 [(' 这种，也在开头加个换行缩进
+            if formatted_raw.startswith("[("):
+                formatted_raw = formatted_raw.replace("[(", "[\n  (", 1)
+            # 结尾处理
+            if formatted_raw.endswith(")]"):
+                formatted_raw = formatted_raw[:-2] + ")\n]"
+            lang = "python"  # 使用 python 高亮
+        else:
+            # 其他文本，保持原样
+            formatted_raw = result_json.strip()
+            lang = "text"
 
     # 工具名称映射（更友好的显示）
     tool_display_names = {
@@ -236,117 +246,120 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
     }
     display_name = tool_display_names.get(tool_name, tool_name)
 
-    # 构建输出
-    output = f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 工具: {display_name}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # 构建输出 - 移除繁琐的分隔线，使用简洁的标题
+    output = f"\n**工具**: {display_name}\n\n"
 
-"""
-
-    # 第一部分：原始输出（使用纯 Markdown 格式，美观展示）
-    raw_output = result.get("raw_output", "")
-    if raw_output:
-        output += "### 📝 原始输出\n\n"
-        output += "```text\n"
-        output += raw_output.strip()
+    # 第一部分：原始输出
+    # 无论是解析成功的 JSON，还是格式化后的 SQL 结果，都在这里统一展示
+    if formatted_raw:
+        output += "**原始输出**\n\n"
+        output += f"```{lang}\n"
+        output += formatted_raw
         output += "\n```\n\n"
 
-    # 第二部分：结构化结果（使用纯 Markdown 格式）
-    output += "### 📈 结构化结果\n\n"
+    # 如果是解析失败且非结构化的结果（即 lang != json），我们可能无法提供"结构化结果"部分
+    # 除非它是我们能够解析的特定非 JSON 格式（如 SQL）。
+    # 但根据当前逻辑，如果是 SQL 结果进入了 except 分支，result 变量是未定义的。
+    # 所以我们需要在这里初始化一个空的 result 字典，以防下面的代码报错
+    if 'result' not in locals():
+        result = {}
 
-    # 根据不同工具类型，提取关键信息
-    if tool_name == "network.ping":
-        success = result.get("success", False)
-        target = result.get("target", "N/A")
-        count = result.get("count", 0)
-        summary = result.get("summary", {})
+    # 第二部分：结构化结果（仅当 result 不为空时显示）
+    if result:
+        output += "**结构化结果**\n\n"
 
-        status_icon = "✅" if success else "❌"
-        output += f"{status_icon} 连接状态: {'正常' if success else '失败'}\n"
-        output += f"📍 目标地址: {target}\n"
-        output += f"📊 统计数据:\n"
-        output += f"   • 发送: {count} 包\n"
+        # 根据不同工具类型，提取关键信息
+        if tool_name == "network.ping":
+            success = result.get("success", False)
+            target = result.get("target", "N/A")
+            count = result.get("count", 0)
+            summary = result.get("summary", {})
 
-        if summary:
-            packet_loss = summary.get("packet_loss_line", "")
-            rtt_line = summary.get("rtt_line", "")
-            if packet_loss:
-                output += f"   • {packet_loss}\n"
-            if rtt_line:
-                output += f"   • {rtt_line}\n"
+            # 移除图标
+            output += f"连接状态: {'正常' if success else '失败'}\n"
+            output += f"目标地址: {target}\n"
+            output += f"统计数据:\n"
+            output += f"   • 发送: {count} 包\n"
 
-    elif tool_name == "network.nslookup":
-        success = result.get("success", False)
-        domain = result.get("domain", "N/A")
-        record_type = result.get("record_type", "A")
+            if summary:
+                packet_loss = summary.get("packet_loss_line", "")
+                rtt_line = summary.get("rtt_line", "")
+                if packet_loss:
+                    output += f"   • {packet_loss}\n"
+                if rtt_line:
+                    output += f"   • {rtt_line}\n"
 
-        status_icon = "✅" if success else "❌"
-        output += f"{status_icon} 查询状态: {'成功' if success else '失败'}\n"
-        output += f"🌐 域名: {domain}\n"
-        output += f"🔍 记录类型: {record_type}\n"
+        elif tool_name == "network.nslookup":
+            success = result.get("success", False)
+            domain = result.get("domain", "N/A")
+            record_type = result.get("record_type", "A")
 
-        # 尝试从原始输出中提取IP地址
-        if raw_output and success:
-            import re
-            ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
-            ips = re.findall(ip_pattern, raw_output)
-            # 过滤掉DNS服务器的IP（通常在前面）
-            if len(ips) > 1:
-                output += f"📍 解析结果: {', '.join(ips[1:])}\n"
-            elif ips:
-                output += f"📍 解析结果: {ips[0]}\n"
+            # 移除图标
+            output += f"查询状态: {'成功' if success else '失败'}\n"
+            output += f"域名: {domain}\n"
+            output += f"记录类型: {record_type}\n"
 
-    elif tool_name == "network.traceroute":
-        success = result.get("success", False)
-        target = result.get("target", "N/A")
-        max_hops = result.get("max_hops", 30)
+            # 尝试从原始输出中提取IP地址
+            if raw_output and success:
+                import re
+                ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+                ips = re.findall(ip_pattern, raw_output)
+                # 过滤掉DNS服务器的IP（通常在前面）
+                if len(ips) > 1:
+                    output += f"解析结果: {', '.join(ips[1:])}\n"
+                elif ips:
+                    output += f"解析结果: {ips[0]}\n"
 
-        status_icon = "✅" if success else "❌"
-        output += f"{status_icon} 追踪状态: {'完成' if success else '失败'}\n"
-        output += f"🎯 目标: {target}\n"
-        output += f"🔢 最大跳数: {max_hops}\n"
+        elif tool_name == "network.traceroute":
+            success = result.get("success", False)
+            target = result.get("target", "N/A")
+            max_hops = result.get("max_hops", 30)
 
-        # 统计实际跳数
-        if raw_output:
-            hop_count = raw_output.count('\n')
-            output += f"📊 实际跳数: 约 {hop_count} 跳\n"
+            # 移除图标
+            output += f"追踪状态: {'完成' if success else '失败'}\n"
+            output += f"目标: {target}\n"
+            output += f"最大跳数: {max_hops}\n"
 
-    elif tool_name == "network.mtr":
-        success = result.get("success", False)
-        target = result.get("target", "N/A")
-        count = result.get("count", 10)
-        summary = result.get("summary", {})
+            # 统计实际跳数
+            if raw_output:
+                hop_count = raw_output.count('\n')
+                output += f"实际跳数: 约 {hop_count} 跳\n"
 
-        status_icon = "✅" if success else "❌"
-        output += f"{status_icon} 测试状态: {'完成' if success else '失败'}\n"
-        output += f"🎯 目标: {target}\n"
-        output += f"📊 测试包数: {count}\n"
+        elif tool_name == "network.mtr":
+            success = result.get("success", False)
+            target = result.get("target", "N/A")
+            count = result.get("count", 10)
+            summary = result.get("summary", {})
 
-        if summary:
-            hops = summary.get("hops", [])
-            total_hops = summary.get("total_hops", 0)
-            output += f"🔢 总跳数: {total_hops} 跳\n"
+            # 移除图标
+            output += f"测试状态: {'完成' if success else '失败'}\n"
+            output += f"目标: {target}\n"
+            output += f"测试包数: {count}\n"
 
-            # 检查是否有丢包
-            if hops:
-                has_loss = any(float(hop.get("loss_percent", "0%").rstrip('%')) > 0 for hop in hops)
-                if has_loss:
-                    output += "⚠️  检测到丢包\n"
-                else:
-                    output += "✅ 全程无丢包\n"
+            if summary:
+                hops = summary.get("hops", [])
+                total_hops = summary.get("total_hops", 0)
+                output += f"总跳数: {total_hops} 跳\n"
 
-    else:
-        # 通用格式
-        success = result.get("success", False)
-        status_icon = "✅" if success else "❌"
-        output += f"{status_icon} 执行状态: {'成功' if success else '失败'}\n"
-        output += f"📋 参数: {json.dumps(params, ensure_ascii=False)}\n"
+                # 检查是否有丢包
+                if hops:
+                    has_loss = any(float(hop.get("loss_percent", "0%").rstrip('%')) > 0 for hop in hops)
+                    if has_loss:
+                        output += "检测到丢包\n"
+                    else:
+                        output += "全程无丢包\n"
 
-    # 如果有错误信息
-    error = result.get("error")
-    if error:
-        output += f"\n❌ 错误信息: {error}\n"
+        else:
+            # 通用格式
+            success = result.get("success", False)
+            # 移除图标
+            output += f"执行状态: {'成功' if success else '失败'}\n"
+            output += f"参数: {json.dumps(params, ensure_ascii=False)}\n"
+
+        # 如果有错误信息
+        error = result.get("error")
+        if error:
+            output += f"\n错误信息: {error}\n"
 
     output += "\n"
 
@@ -389,13 +402,13 @@ def final_answer_node(state: GraphState) -> GraphState:
                 # 根据 target_agent 确定结果标题
                 target_agent = (state.get("target_agent") or "").lower()
                 if "database" in target_agent:
-                    base_title = "📊 数据库查询结果"
+                    base_title = "数据库查询结果"
                 elif "rag" in target_agent:
-                    base_title = "📊 知识库检索结果"
+                    base_title = "知识库检索结果"
                 elif "network" in target_agent:
-                    base_title = "📊 网络诊断结果"
+                    base_title = "网络诊断结果"
                 else:
-                    base_title = "📊 任务执行结果"
+                    base_title = "任务执行结果"
 
                 # 添加标题
                 final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -413,7 +426,7 @@ def final_answer_node(state: GraphState) -> GraphState:
                     observation = record.get("observation", "")
 
                     if tool_count > 1:
-                        final_answer += f"\n【工具 {i}/{tool_count}】"
+                        final_answer += f"\n**--- 工具 {i}/{tool_count} ---**\n"
 
                     # 从观察结果中提取工具返回的 JSON
                     # 观察结果格式：工具 network.ping 执行成功。结果:\n{json}
@@ -424,20 +437,18 @@ def final_answer_node(state: GraphState) -> GraphState:
                             final_answer += formatted
                         except Exception as e:
                             logger.warning(f"解析工具结果失败: {e}")
-                            final_answer += f"\n{observation}\n"
+                            # 降级处理：直接显示
+                            final_answer += f"\n**工具**: {tool_name}\n\n"
+                            final_answer += "**原始输出**\n\n```text\n"
+                            final_answer += f"{observation}\n```\n\n"
                     else:
-                        # 工具执行失败或格式不符
-                        final_answer += f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 工具: {tool_name}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                        # 工具执行失败或格式不符 (例如 MySQL 查询直接返回了元组列表字符串，非 JSON)
+                        final_answer += f"\n**工具**: {tool_name}\n\n"
+                        final_answer += "**原始输出**\n\n```text\n"
+                        final_answer += f"{observation.strip()}\n```\n\n"
 
-{observation}
-
-"""
-
-                # 添加分隔线
-                final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                # 添加分隔线 (使用更简洁的 Markdown 分隔线)
+                final_answer += "\n---\n\n"
 
                 # 添加完整执行结果（使用纯 Markdown 格式，默认展开）
                 # 只展示工具执行的结果，不展示思考过程（因为流式输出已展示）
@@ -447,7 +458,7 @@ def final_answer_node(state: GraphState) -> GraphState:
                 ]
 
                 if tool_results:
-                    final_answer += f"### 📋 完整执行结果（共 {len(tool_results)} 个工具）\n\n"
+                    final_answer += f"### 完整执行结果（共 {len(tool_results)} 个工具）\n\n"
 
                     for i, record in enumerate(tool_results, 1):
                         action = record.get("action", {})
@@ -456,7 +467,7 @@ def final_answer_node(state: GraphState) -> GraphState:
                         observation = record.get("observation", "")
 
                         # 工具标题
-                        final_answer += f"#### 🔧 {tool_name}\n\n"
+                        final_answer += f"#### 工具{tool_name}\n\n"
 
                         # 显示参数（简洁格式）
                         if params:
@@ -502,13 +513,13 @@ def final_answer_node(state: GraphState) -> GraphState:
                 tool_count = len(all_results)
                 target_agent = (state.get("target_agent") or "").lower()
                 if "database" in target_agent:
-                    base_title = "📊 数据库查询结果"
+                    base_title = "数据库查询结果"
                 elif "rag" in target_agent:
-                    base_title = "📊 知识库检索结果"
+                    base_title = "知识库检索结果"
                 elif "network" in target_agent:
-                    base_title = "📊 网络诊断结果"
+                    base_title = "网络诊断结果"
                 else:
-                    base_title = "📊 任务执行结果"
+                    base_title = "任务执行结果"
 
                 final_answer += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 if tool_count == 1:
@@ -536,10 +547,10 @@ def final_answer_node(state: GraphState) -> GraphState:
                         error = result.get("error", "未知错误")
                         final_answer += f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 工具: {tool_name}
+工具: {tool_name}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-❌ 执行失败: {error}
+执行失败: {error}
 
 """
 

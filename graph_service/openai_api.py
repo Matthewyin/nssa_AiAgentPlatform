@@ -337,7 +337,7 @@ async def _stream_response(
                 {
                     "index": 0,
                     "delta": {
-                        "content": f"\n\n❌ 错误: {str(e)}\n"
+                        "content": f"\n\n错误: {str(e)}\n"
                     },
                     "finish_reason": "stop"
                 }
@@ -369,7 +369,7 @@ def _format_token_stats(stats: Dict[str, Any]) -> str:
     # 格式化为紧凑的统计信息
     output = "\n\n---\n\n"
     output += "<details>\n"
-    output += "<summary>📊 <b>Token 统计</b></summary>\n\n"
+    output += "<summary>Token 统计</summary>\n\n"
     output += f"| 指标 | 数值 |\n"
     output += f"|------|------|\n"
     output += f"| LLM 调用次数 | {llm_calls} |\n"
@@ -398,7 +398,7 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
         if node_name == "router":
             agent_plan = state_update.get("agent_plan", [])
             if agent_plan:
-                output = "\n🔀 **路由决策**\n\n"
+                output = "\n**Router**\n\n"
                 for i, plan in enumerate(agent_plan, 1):
                     agent_name = plan.get("agent", "")
                     task = plan.get("task", "")
@@ -417,19 +417,26 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
                 params = next_action.get("params", {})
 
                 if thought:
-                    # 使用纯 Markdown 格式，默认展开
-                    output = "\n#### 🤔 思考中...\n\n"
-                    output += f"```\n{thought}\n```\n\n"
+                    # 使用 <details> 实现折叠，默认折叠
+                    # 标题加粗
+                    output = "\n<details>\n<summary>Thinking</summary>\n\n"
+                    
+                    # 使用引用块 (> ) 展示思考内容
+                    # 这样可以支持自动换行和 Markdown 渲染
+                    # 将每行内容都加上 "> " 前缀
+                    formatted_thought = "\n".join([f"> {line}" for line in thought.split("\n")])
+                    output += f"{formatted_thought}\n\n"
 
-                    # 如果有行动决策，也显示出来
+                    # 如果有行动决策，也使用引用块展示
                     if action_type == "TOOL":
-                        output += f"🔧 **准备执行工具**: `{tool_name}`\n"
+                        output += f"> **准备执行工具**: `{tool_name}`\n\n"
                         if params:
-                            output += f"**参数**: `{json.dumps(params, ensure_ascii=False)}`\n"
-                        output += "\n"
+                            # 参数部分使用 JSON 代码块，方便阅读和复制
+                            output += f"```json\n{json.dumps(params, ensure_ascii=False, indent=2)}\n```\n"
                     elif action_type == "FINISH":
-                        output += "✅ **准备完成任务**\n\n"
-
+                        output += "> **准备完成任务**\n"
+                    
+                    output += "\n</details>\n\n"
                     return output
             return ""
 
@@ -448,16 +455,43 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
                     # 尝试提取结构化摘要
                     summary = extract_result_summary(tool_name, observation) if tool_name else None
 
-                    # 使用纯 Markdown 格式，默认展开
-                    output = "\n#### 📊 观察结果\n\n"
+                    # 使用 <details> 实现折叠,默认打开
+                    # output = "\n<details open=\"\">\n<summary>Result</summary>\n\n"
+                    # 移除折叠，直接使用标题
+                    output = "\n**Result**\n\n"
 
                     # 如果有摘要，先显示摘要
                     if summary:
-                        output += f"> 📌 **摘要**: {summary}\n\n"
+                        output += f"> **摘要**: {summary}\n\n"
 
-                    # 前端流式展示：不截断，显示完整结果
-                    # 使用代码块包裹，保持格式
-                    output += f"```\n{observation}\n```\n\n"
+                    # 观察结果主体
+                    # 保持使用代码块，以提供复制/保存功能
+                    obs_str = observation.strip()
+                    formatted_obs = observation
+                    lang = "text"
+
+                    try:
+                        # 尝试解析 JSON
+                        parsed_json = json.loads(obs_str)
+                        # 如果成功，重新格式化
+                        formatted_obs = json.dumps(parsed_json, ensure_ascii=False, indent=2)
+                        lang = "json"
+                    except json.JSONDecodeError:
+                        # 如果不是 JSON，尝试检测是否为 Python 列表/元组字符串（SQL 结果）
+                        # 与 final_answer.py 中的逻辑保持一致
+                        import re
+                        if obs_str.startswith("[") and "), (" in obs_str:
+                             # 针对 Python List[Tuple] 结构的简单格式化
+                             formatted_obs = obs_str.replace("), (", "),\n  (")
+                             if formatted_obs.startswith("[("):
+                                 formatted_obs = formatted_obs.replace("[(", "[\n  (", 1)
+                             if formatted_obs.endswith(")]"):
+                                 formatted_obs = formatted_obs[:-2] + ")\n]"
+                             lang = "python"
+                    
+                    output += f"```{lang}\n{formatted_obs}\n```\n\n"
+                    
+                    # output += "\n</details>\n\n"
 
                     return output
             return ""
@@ -479,7 +513,7 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
                 if current_agent_index < len(agent_plan):
                     current_plan = agent_plan[current_agent_index]
                     agent_name = current_plan.get("agent", "")
-                    return f"\n🔄 **切换到 Agent**: {agent_name}\n\n"
+                    return f"\n**切换到 Agent**: {agent_name}\n\n"
 
             return ""
 
