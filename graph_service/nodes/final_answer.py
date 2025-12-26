@@ -265,96 +265,49 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
         result = {}
 
     # 第二部分：结构化结果（仅当 result 不为空时显示）
+    # 第二部分：结构化结果（仅当 result 不为空时显示）
     if result:
-        output += "**结构化结果**\n\n"
+        # 预备结构化数据内容
+        structured_content = ""
 
-        # 根据不同工具类型，提取关键信息
-        if tool_name == "network.ping":
-            success = result.get("success", False)
-            target = result.get("target", "N/A")
-            count = result.get("count", 0)
-            summary = result.get("summary", {})
-
-            # 移除图标
-            output += f"连接状态: {'正常' if success else '失败'}\n"
-            output += f"目标地址: {target}\n"
-            output += f"统计数据:\n"
-            output += f"   • 发送: {count} 包\n"
-
-            if summary:
-                packet_loss = summary.get("packet_loss_line", "")
-                rtt_line = summary.get("rtt_line", "")
-                if packet_loss:
-                    output += f"   • {packet_loss}\n"
-                if rtt_line:
-                    output += f"   • {rtt_line}\n"
-
-        elif tool_name == "network.nslookup":
-            success = result.get("success", False)
-            domain = result.get("domain", "N/A")
-            record_type = result.get("record_type", "A")
-
-            # 移除图标
-            output += f"查询状态: {'成功' if success else '失败'}\n"
-            output += f"域名: {domain}\n"
-            output += f"记录类型: {record_type}\n"
-
-            # 尝试从原始输出中提取IP地址
-            if raw_output and success:
-                import re
-                ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
-                ips = re.findall(ip_pattern, raw_output)
-                # 过滤掉DNS服务器的IP（通常在前面）
-                if len(ips) > 1:
-                    output += f"解析结果: {', '.join(ips[1:])}\n"
-                elif ips:
-                    output += f"解析结果: {ips[0]}\n"
-
-        elif tool_name == "network.traceroute":
-            success = result.get("success", False)
-            target = result.get("target", "N/A")
-            max_hops = result.get("max_hops", 30)
-
-            # 移除图标
-            output += f"追踪状态: {'完成' if success else '失败'}\n"
-            output += f"目标: {target}\n"
-            output += f"最大跳数: {max_hops}\n"
-
-            # 统计实际跳数
-            if raw_output:
-                hop_count = raw_output.count('\n')
-                output += f"实际跳数: 约 {hop_count} 跳\n"
-
-        elif tool_name == "network.mtr":
-            success = result.get("success", False)
-            target = result.get("target", "N/A")
-            count = result.get("count", 10)
-            summary = result.get("summary", {})
-
-            # 移除图标
-            output += f"测试状态: {'完成' if success else '失败'}\n"
-            output += f"目标: {target}\n"
-            output += f"测试包数: {count}\n"
-
-            if summary:
-                hops = summary.get("hops", [])
-                total_hops = summary.get("total_hops", 0)
-                output += f"总跳数: {total_hops} 跳\n"
-
-                # 检查是否有丢包
-                if hops:
-                    has_loss = any(float(hop.get("loss_percent", "0%").rstrip('%')) > 0 for hop in hops)
-                    if has_loss:
-                        output += "检测到丢包\n"
-                    else:
-                        output += "全程无丢包\n"
-
+        # 1. 优先检查标准接口字段 (Scheme 3 预留)
+        if "display_data" in result and isinstance(result["display_data"], dict):
+            # 如果工具必须返回用于展示的数据
+            for k, v in result["display_data"].items():
+                structured_content += f"{k}: {v}\n"
+        elif "summary" in result and isinstance(result["summary"], str):
+             structured_content += f"摘要: {result['summary']}\n"
+        
+        # 2. 如果没有标准字段，执行通用智能遍历 (Scheme 1 落地)
         else:
-            # 通用格式
-            success = result.get("success", False)
-            # 移除图标
-            output += f"执行状态: {'成功' if success else '失败'}\n"
-            output += f"参数: {json.dumps(params, ensure_ascii=False)}\n"
+            # 过滤黑名单字段
+            ignored_keys = {"raw_output", "stdout", "stderr", "error", "success", "is_error", "tool", "action", "thought"}
+            
+            # 遍历所有字段
+            for key, value in result.items():
+                if key in ignored_keys:
+                    continue
+                
+                # 简单类型直接显示
+                if isinstance(value, (str, int, float, bool)):
+                    # 格式化 Key (可选: 把 snake_case 转为 Title Case)
+                    label = key.replace("_", " ").title()
+                    structured_content += f"{label}: {value}\n"
+                
+                # 列表类型（如数据库行），尝试渲染为表格
+                elif isinstance(value, list) and value:
+                    from ..utils import format_as_markdown_table
+                    # 仅当列表长度适中时显示表格，避免刷屏
+                    if len(value) > 0:
+                        label = key.replace("_", " ").title()
+                        structured_content += f"\n**{label}**:\n"
+                        structured_content += format_as_markdown_table(value) + "\n"
+
+        # 只有当生成了内容时才添加标题
+        if structured_content:
+            output += "**结构化结果**\n\n"
+            output += structured_content
+            output += "\n"
 
         # 如果有错误信息
         error = result.get("error")
