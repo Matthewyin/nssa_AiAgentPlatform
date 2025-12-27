@@ -214,6 +214,7 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
         格式化后的三段式文本
     """
     # 尝试解析JSON结果
+    # 尝试解析JSON结果
     try:
         result = json.loads(result_json)
         # 如果是 JSON，重新格式化以提升可读性
@@ -251,9 +252,11 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
 
     # 第一部分：原始输出
     # 无论是解析成功的 JSON，还是格式化后的 SQL 结果，都在这里统一展示
-    if formatted_raw:
+    # 第一部分：原始输出
+    # 仅当解析完全失败（无法识别为 JSON 或 Python 结构）时，才显示原始文本作为兜底
+    if lang == "text":
         output += "**原始输出**\n\n"
-        output += f"```{lang}\n"
+        output += f"```text\n"
         output += formatted_raw
         output += "\n```\n\n"
 
@@ -274,7 +277,19 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
         if "display_data" in result and isinstance(result["display_data"], dict):
             # 如果工具必须返回用于展示的数据
             for k, v in result["display_data"].items():
-                structured_content += f"{k}: {v}\n"
+                if isinstance(v, list):
+                    # 如果是列表（如 SQL 结果），强制渲染为表格
+                    from ..utils import format_as_markdown_table
+                    structured_content += f"\n**{k}**:\n"
+                    structured_content += format_as_markdown_table(v) + "\n"
+                elif isinstance(v, dict):
+                    # 如果是字典（可能是复杂对象），也尝试渲染为表格或代码块
+                    from ..utils import format_as_markdown_table
+                    structured_content += f"\n**{k}**:\n"
+                    structured_content += format_as_markdown_table(v) + "\n"
+                else:
+                    # 简单类型直接显示
+                    structured_content += f"{k}: {v}\n"
         elif "summary" in result and isinstance(result["summary"], str):
              structured_content += f"摘要: {result['summary']}\n"
         
@@ -400,18 +415,19 @@ def final_answer_node(state: GraphState) -> GraphState:
                         final_answer += "**原始输出**\n\n```text\n"
                         final_answer += f"{observation.strip()}\n```\n\n"
 
-                # 添加分隔线 (使用更简洁的 Markdown 分隔线)
-                final_answer += "\n---\n\n"
+                # [Modify] 移除硬分隔线，改用折叠块
+                # final_answer += "\n---\n\n"
 
-                # 添加完整执行结果（使用纯 Markdown 格式，默认展开）
-                # 只展示工具执行的结果，不展示思考过程（因为流式输出已展示）
+                # 添加完整执行结果（使用 HTML <details> 折叠，默认隐藏，点击展开）
+                # 模仿类似 Openai API think 的折叠效果
                 tool_results = [
                     record for record in execution_history
                     if record.get("action", {}).get("type") == "TOOL" and record.get("observation")
                 ]
 
                 if tool_results:
-                    final_answer += f"### 完整执行结果（共 {len(tool_results)} 个工具）\n\n"
+                    final_answer += "<details>\n"
+                    final_answer += f"<summary>完整执行结果（共 {len(tool_results)} 个工具）</summary>\n\n"
 
                     for i, record in enumerate(tool_results, 1):
                         action = record.get("action", {})
@@ -420,7 +436,7 @@ def final_answer_node(state: GraphState) -> GraphState:
                         observation = record.get("observation", "")
 
                         # 工具标题
-                        final_answer += f"#### 工具{tool_name}\n\n"
+                        final_answer += f"#### 工具 {tool_name}\n\n"
 
                         # 显示参数（简洁格式）
                         if params:
@@ -432,9 +448,10 @@ def final_answer_node(state: GraphState) -> GraphState:
                         formatted_result = format_full_result(tool_name, observation)
                         final_answer += formatted_result
                         final_answer += "\n\n"
+                    
+                    final_answer += "</details>\n\n"
 
-                        if i < len(tool_results):
-                            final_answer += "---\n\n"
+
 
                 # 添加 LLM 综合分析（使用纯 Markdown 格式）
                 # 检查是否应该跳过 LLM 分析（简单任务优化）

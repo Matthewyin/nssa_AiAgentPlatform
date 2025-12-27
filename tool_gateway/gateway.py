@@ -167,8 +167,12 @@ class ToolGateway:
             mcp_manager = await self._get_mcp_manager()
             tool_result = await mcp_manager.call_tool(binding.physical_tool, params)
 
-            # 5. 完成调用，记录成功
-            result.complete(ToolCallStatus.SUCCESS, result=tool_result)
+            # 5. [中间件] 结果增强与标准化
+            from graph_service.utils.result_summarizer import enhance_result
+            enhanced_result = enhance_result(logical_name, tool_result)
+
+            # 6. 完成调用，记录成功
+            result.complete(ToolCallStatus.SUCCESS, result=enhanced_result)
             logger.info(f"[{request.request_id}] 工具调用成功: {logical_name}")
 
             # 更新 Server 统计
@@ -186,7 +190,7 @@ class ToolGateway:
                 self.registry.record_request(selected_server.name, success=False)
                 self.registry.mark_unhealthy(selected_server.name)
 
-        # 6. 记录审计日志
+        # 7. 记录审计日志
         self.audit_logger.log_call(request, result)
 
         return result
@@ -227,7 +231,12 @@ class ToolGateway:
         try:
             mcp_manager = await self._get_mcp_manager()
             tool_result = await mcp_manager.call_tool(physical_name, params)
-            result.complete(ToolCallStatus.SUCCESS, result=tool_result)
+            
+            # [中间件] 结果增强
+            from graph_service.utils.result_summarizer import enhance_result
+            enhanced_result = enhance_result(physical_name, tool_result)
+            
+            result.complete(ToolCallStatus.SUCCESS, result=enhanced_result)
         except Exception as e:
             result.complete(ToolCallStatus.FAILED, error=str(e))
         
