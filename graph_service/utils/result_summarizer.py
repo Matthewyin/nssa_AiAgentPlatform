@@ -280,16 +280,20 @@ def enhance_result(tool_name: str, result: Any) -> Dict[str, Any]:
             # 不是 JSON，尝试解析为 Python 字面量 (如 SQL 结果)
             parsed = _try_parse_python_literal(result)
             if isinstance(parsed, list):
+                display_list = parsed[:5] if len(parsed) > 5 else parsed
+                display_key = f"查询结果 (前5/{len(parsed)}条)" if len(parsed) > 5 else "查询结果"
                 return {
                     "result": parsed,
-                    "display_data": {"查询结果": parsed}
+                    "display_data": {display_key: display_list}
                 }
     
     # 再次检查：如果是列表（可能是原生返回或刚刚解析出来的）
     if isinstance(result, list):
+        display_list = result[:5] if len(result) > 5 else result
+        display_key = f"查询结果 (前5/{len(result)}条)" if len(result) > 5 else "查询结果"
         return {
             "result": result, 
-            "display_data": {"查询结果": result}
+            "display_data": {display_key: display_list}
         }
     
     # [Fix] 处理嵌套 JSON 字符串的情况 (例如 result["result"] 是一个 JSON 字符串)
@@ -337,6 +341,12 @@ def enhance_result(tool_name: str, result: Any) -> Dict[str, Any]:
     if display_data:
         enhanced["display_data"] = display_data
     
+    # [Optimization] 针对 mtr 等工具的 raw_output 进行优化展示
+    # 将长字符串转换为列表，使 JSON 视图更易读
+    if isinstance(enhanced, dict) and "raw_output" in enhanced and isinstance(enhanced["raw_output"], str):
+        if "\n" in enhanced["raw_output"]:
+            enhanced["raw_output"] = enhanced["raw_output"].split("\n")
+
     return enhanced
 
 
@@ -512,6 +522,13 @@ def format_full_result(tool_name: str, observation: str) -> str:
             # 过滤掉一些不必要的系统字段，减少噪音
             if "display_data" in result_data:
                 del result_data["display_data"] # 完整结果里不需要重复显示 display_data，只看 raw 即可
+            if "summary" in result_data:
+                del result_data["summary"]
+
+            # [Optimization] 如果 result 字段是列表（如 SQL 结果被 enhance_result 包裹了一层），直接渲染列表表格
+            # 这样能避免显示 {"result": [...]} 这种多余的层级
+            if "result" in result_data and isinstance(result_data["result"], list):
+                return format_as_markdown_table(result_data["result"])
             
             return f"```json\n{json.dumps(result_data, ensure_ascii=False, indent=2)}\n```"
 

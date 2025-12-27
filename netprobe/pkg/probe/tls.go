@@ -111,12 +111,16 @@ func TLSProbe(opts TLSOptions) Result {
 	if state.CipherSuite != 0 {
 		details["cipher_suite"] = tls.CipherSuiteName(state.CipherSuite)
 	}
+	details["tls_version"] = tls.VersionName(state.Version)
+
 	if len(state.PeerCertificates) > 0 {
 		cert := state.PeerCertificates[0]
 		details["cert_subject"] = cert.Subject.String()
 		details["cert_issuer"] = cert.Issuer.String()
 		details["cert_not_before"] = cert.NotBefore
 		details["cert_not_after"] = cert.NotAfter
+		details["cert_dns_names"] = cert.DNSNames
+		details["cert_days_remaining"] = int(time.Until(cert.NotAfter).Hours() / 24)
 	}
 
 	return Result{

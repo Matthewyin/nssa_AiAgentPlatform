@@ -65,7 +65,7 @@ optimization:
   router_think_merge:
     enabled: true
     # 是否在路由时同时输出首次行动
-    include_first_action: true
+    include_first_action: false
   
   # 2.2 意图分类预处理
   intent_classification:

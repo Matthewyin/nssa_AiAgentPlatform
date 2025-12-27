@@ -17,7 +17,7 @@ type Result struct {
 	StatusCode   int            `json:"status_code,omitempty"`
 	Protocol     string         `json:"protocol,omitempty"`
 	Cipher       string         `json:"cipher,omitempty"`
-	RawOutput    string         `json:"raw_output,omitempty"`
+	RawOutput    any            `json:"raw_output,omitempty"`
 	Summary      map[string]any `json:"summary,omitempty"`
 	Details      map[string]any `json:"details,omitempty"`
 }

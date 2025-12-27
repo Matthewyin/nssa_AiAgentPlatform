@@ -467,27 +467,74 @@ def _format_node_output(node_name: str, state_update: Dict[str, Any]) -> str:
                     # 观察结果主体
                     # 保持使用代码块，以提供复制/保存功能
                     obs_str = observation.strip()
-                    formatted_obs = observation
+                    formatted_obs = obs_str
                     lang = "text"
+                    prefix = ""
+                    json_part = obs_str
+
+                    # 尝试分离前缀（如 "工具 xxx 执行成功。结果:"）
+                    if "结果:" in obs_str:
+                        parts = obs_str.split("结果:", 1)
+                        prefix = parts[0] + "结果:"
+                        json_part = parts[1].strip()
+                    elif "结果：" in obs_str:
+                        parts = obs_str.split("结果：", 1)
+                        prefix = parts[0] + "结果："
+                        json_part = parts[1].strip()
 
                     try:
                         # 尝试解析 JSON
-                        parsed_json = json.loads(obs_str)
-                        # 如果成功，重新格式化
+                        parsed_json = json.loads(json_part)
+                        
+                        # [Optimization] 清理冗余数据
+                        if isinstance(parsed_json, dict):
+                            if "display_data" in parsed_json:
+                                del parsed_json["display_data"]
+                            if "summary" in parsed_json:
+                                del parsed_json["summary"]
+                            # 如果 result 是列表，直接展开
+                            if "result" in parsed_json and isinstance(parsed_json["result"], list):
+                                parsed_json = parsed_json["result"]
+                            
+                            # [View Fix] 针对 mtr 等工具的 raw_output，如果是长字符串，强制拆分为列表以提高 JSON 可读性
+                            if "raw_output" in parsed_json and isinstance(parsed_json["raw_output"], str):
+                                if "\n" in parsed_json["raw_output"]:
+                                    parsed_json["raw_output"] = parsed_json["raw_output"].split("\n")
+                                elif "\\n" in parsed_json["raw_output"]:
+                                    # 处理转义的换行符
+                                    parsed_json["raw_output"] = parsed_json["raw_output"].replace("\\n", "\n").split("\n")
+
+                        # 重新格式化
                         formatted_obs = json.dumps(parsed_json, ensure_ascii=False, indent=2)
                         lang = "json"
+                        
+                        # 如果有前缀，将前缀放在代码块外面
+                        if prefix:
+                            output += f"{prefix}\n"
+                            output += f"```{lang}\n{formatted_obs}\n```\n\n"
+                            return output
+                            
                     except json.JSONDecodeError:
                         # 如果不是 JSON，尝试检测是否为 Python 列表/元组字符串（SQL 结果）
-                        # 与 final_answer.py 中的逻辑保持一致
                         import re
-                        if obs_str.startswith("[") and "), (" in obs_str:
-                             # 针对 Python List[Tuple] 结构的简单格式化
-                             formatted_obs = obs_str.replace("), (", "),\n  (")
+                        # 对 Python 结果也尝试分离前缀处理，但比较复杂，暂时只处理 split 后的部分或整体
+                        target_str = json_part if prefix else obs_str
+                        
+                        if target_str.startswith("[") and "), (" in target_str:
+                             formatted_obs = target_str.replace("), (", "),\n  (")
                              if formatted_obs.startswith("[("):
                                  formatted_obs = formatted_obs.replace("[(", "[\n  (", 1)
                              if formatted_obs.endswith(")]"):
                                  formatted_obs = formatted_obs[:-2] + ")\n]"
                              lang = "python"
+                             
+                             if prefix:
+                                 output += f"{prefix}\n"
+                                 output += f"```{lang}\n{formatted_obs}\n```\n\n"
+                                 return output
+                        else:
+                            # 纯文本情况，直接使用原始 formatted_obs (即 obs_str)
+                            pass
                     
                     output += f"```{lang}\n{formatted_obs}\n```\n\n"
                     

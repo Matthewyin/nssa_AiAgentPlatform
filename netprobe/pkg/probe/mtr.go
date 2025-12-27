@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -26,7 +27,14 @@ func Mtr(opts MtrOptions) Result {
 		opts.Target,
 	}
 
-	cmdResult, err := RunCommand(opts.TimeoutSec, "mtr", args...)
+	cmdName := "mtr"
+	cmdArgs := args
+	if runtime.GOOS != "windows" {
+		cmdName = "sudo"
+		cmdArgs = append([]string{"-n", "/opt/homebrew/sbin/mtr"}, args...)
+	}
+
+	cmdResult, err := RunCommand(opts.TimeoutSec, cmdName, cmdArgs...)
 
 	result := Result{
 		Tool:         toolName,
@@ -38,7 +46,12 @@ func Mtr(opts MtrOptions) Result {
 	}
 
 	if cmdResult != nil {
-		result.RawOutput = TrimOutput(cmdResult.Stdout, 8000)
+		raw := TrimOutput(cmdResult.Stdout, 8000)
+		if strings.Contains(raw, "\n") {
+			result.RawOutput = strings.Split(raw, "\n")
+		} else {
+			result.RawOutput = raw
+		}
 		result.Summary["duration_ms"] = cmdResult.Duration.Milliseconds()
 	}
 
