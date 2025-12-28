@@ -1,0 +1,8 @@
+graph TD
+    core_router{{"核心路由器"}}
+    aggregation_switch["汇聚交换机"]
+    access_switch_1["接入交换机1"]
+    access_switch_2["接入交换机2"]
+    core_router -- "" --> aggregation_switch
+    aggregation_switch -- "" --> access_switch_1
+    aggregation_switch -- "" --> access_switch_2

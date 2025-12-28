@@ -1,0 +1,20 @@
+graph TD
+    subgraph 安外数据中心["安外数据中心"]
+        aw_core{{"安外核心路由器"}}
+        aw_agg["安外汇聚交换机"]
+        aw_acc1["安外接入交换机1"]
+        aw_acc2["安外接入交换机2"]
+    end
+    subgraph 洋桥数据中心["洋桥数据中心"]
+        yq_core{{"洋桥核心路由器"}}
+        yq_agg["洋桥汇聚交换机"]
+        yq_acc1["洋桥接入交换机1"]
+        yq_acc2["洋桥接入交换机2"]
+    end
+    aw_core -- "高速链路" --> aw_agg
+    aw_agg -- "接入链路" --> aw_acc1
+    aw_agg -- "接入链路" --> aw_acc2
+    yq_core -- "高速链路" --> yq_agg
+    yq_agg -- "接入链路" --> yq_acc1
+    yq_agg -- "接入链路" --> yq_acc2
+    aw_core -- "跨数据中心互联" --> yq_core

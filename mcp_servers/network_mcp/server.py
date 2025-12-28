@@ -63,6 +63,10 @@ async def list_tools() -> List[Tool]:
     tools = []
     
     for tool_key, tool_config in network_tools.items():
+        # Skip tools that don't have a runner configuration (e.g., diagram tools)
+        if "runner" not in tool_config:
+            continue
+
         # 构建inputSchema
         properties = {}
         required = []

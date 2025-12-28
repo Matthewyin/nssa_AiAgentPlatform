@@ -107,3 +107,10 @@ static_servers:
     weight: 100
     config_ref: "mysql-mcp"
 
+  - name: "diagram-mcp"
+    description: "绘图生成 MCP Server"
+    environment: "default"
+    weight: 100
+    config_ref: "diagram-mcp"
+
+

@@ -49,6 +49,13 @@ app.include_router(openai_router, tags=["OpenAI Compatible API"])
 # 注册 Server Registry API 路由
 app.include_router(registry_router, tags=["Server Registry"])
 
+# 挂载静态文件目录 (用于 serving 生成的绘图文件)
+from fastapi.staticfiles import StaticFiles
+artifacts_path = Path(__file__).parent.parent / "data" / "artifacts"
+artifacts_path.mkdir(parents=True, exist_ok=True)
+app.mount("/files", StaticFiles(directory=str(artifacts_path)), name="files")
+
+
 # 编译LangGraph图
 graph = compile_graph()
 

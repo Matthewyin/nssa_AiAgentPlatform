@@ -1,0 +1,352 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "nssa-ai-agent",
+  "elements": [
+    {
+      "id": "core_router",
+      "type": "rectangle",
+      "x": 107.79641532356123,
+      "y": 378.46432155503675,
+      "width": 80.0,
+      "height": 80.0,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "#ffcccc",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "core_router-text",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "core_router-text",
+      "type": "text",
+      "x": 147.79641532356123,
+      "y": 348.46432155503675,
+      "width": 50,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": null,
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "text": "\u6838\u5fc3\u8def\u7531\u5668",
+      "fontSize": 16,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "core_router"
+    },
+    {
+      "id": "aggregation_switch",
+      "type": "rectangle",
+      "x": 499.1449287200887,
+      "y": 500.78565511988387,
+      "width": 80.0,
+      "height": 80.0,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "#ccffcc",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "aggregation_switch-text",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "aggregation_switch-text",
+      "type": "text",
+      "x": 539.1449287200887,
+      "y": 470.78565511988387,
+      "width": 50,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": null,
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "text": "\u6c47\u805a\u4ea4\u6362\u673a",
+      "fontSize": 16,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "aggregation_switch"
+    },
+    {
+      "id": "access_switch_1",
+      "type": "rectangle",
+      "x": 800.4860446008614,
+      "y": 220.75002332507927,
+      "width": 80.0,
+      "height": 80.0,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "#ccffcc",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "access_switch_1-text",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "access_switch_1-text",
+      "type": "text",
+      "x": 840.4860446008614,
+      "y": 190.75002332507927,
+      "width": 58,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": null,
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "text": "\u63a5\u5165\u4ea4\u6362\u673a1",
+      "fontSize": 16,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "access_switch_1"
+    },
+    {
+      "id": "access_switch_2",
+      "type": "rectangle",
+      "x": 592.5726113554887,
+      "y": 900.0,
+      "width": 80.0,
+      "height": 80.0,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "#ccffcc",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "id": "access_switch_2-text",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "access_switch_2-text",
+      "type": "text",
+      "x": 632.5726113554887,
+      "y": 870.0,
+      "width": 58,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "roundness": null,
+      "seed": 1,
+      "version": 1,
+      "versionNonce": 0,
+      "isDeleted": false,
+      "text": "\u63a5\u5165\u4ea4\u6362\u673a2",
+      "fontSize": 16,
+      "fontFamily": 1,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "access_switch_2"
+    },
+    {
+      "id": "edge-core_router-aggregation_switch",
+      "type": "arrow",
+      "x": 0,
+      "y": 0,
+      "width": 100,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "startBinding": {
+        "elementId": "core_router",
+        "focus": 0.5,
+        "gap": 1
+      },
+      "endBinding": {
+        "elementId": "aggregation_switch",
+        "focus": 0.5,
+        "gap": 1
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          10
+        ]
+      ]
+    },
+    {
+      "id": "edge-aggregation_switch-access_switch_1",
+      "type": "arrow",
+      "x": 0,
+      "y": 0,
+      "width": 100,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "startBinding": {
+        "elementId": "aggregation_switch",
+        "focus": 0.5,
+        "gap": 1
+      },
+      "endBinding": {
+        "elementId": "access_switch_1",
+        "focus": 0.5,
+        "gap": 1
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          10
+        ]
+      ]
+    },
+    {
+      "id": "edge-aggregation_switch-access_switch_2",
+      "type": "arrow",
+      "x": 0,
+      "y": 0,
+      "width": 100,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#000000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "startBinding": {
+        "elementId": "aggregation_switch",
+        "focus": 0.5,
+        "gap": 1
+      },
+      "endBinding": {
+        "elementId": "access_switch_2",
+        "focus": 0.5,
+        "gap": 1
+      },
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          10,
+          10
+        ]
+      ]
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}

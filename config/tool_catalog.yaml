@@ -172,3 +172,67 @@ tools:
       allowed_agents: ["database_agent"]
       require_confirmation: false
 
+  # ============== 绘图工具 ==============
+  # ============== 绘图工具 ==============
+  # 生成 Mermaid 图
+  generate_mermaid:
+    logical_name: "network.generate_mermaid"
+    description: "生成 Mermaid 格式的拓扑图代码"
+    category: "diagram"
+    tags: ["diagram", "mermaid", "visualization"]
+    bindings:
+      - mcp_server: "diagram-mcp"
+        physical_tool: "network.generate_mermaid"
+        environment: "default"
+        priority: 1
+        enabled: true
+    # Schema 较复杂，使用 object 允许任意拓扑结构
+    input_schema:
+      type: object
+      additionalProperties: true
+      required: ["nodes", "edges"]
+    permissions:
+      allowed_agents: ["network_agent", "database_agent"]
+      require_confirmation: false
+
+  # 生成 Excalidraw 文件
+  generate_excalidraw:
+    logical_name: "network.generate_excalidraw"
+    description: "生成 Excalidraw (JSON) 格式的绘图文件"
+    category: "diagram"
+    tags: ["diagram", "excalidraw", "visualization"]
+    bindings:
+      - mcp_server: "diagram-mcp"
+        physical_tool: "network.generate_excalidraw"
+        environment: "default"
+        priority: 1
+        enabled: true
+    input_schema:
+      type: object
+      additionalProperties: true
+      required: ["nodes", "edges"]
+    permissions:
+      allowed_agents: ["network_agent"]
+      require_confirmation: false
+
+  # 生成 Draw.io 文件
+  generate_drawio:
+    logical_name: "network.generate_drawio"
+    description: "生成 Draw.io (XML) 格式的绘图文件"
+    category: "diagram"
+    tags: ["diagram", "drawio", "visualization"]
+    bindings:
+      - mcp_server: "diagram-mcp"
+        physical_tool: "network.generate_drawio"
+        environment: "default"
+        priority: 1
+        enabled: true
+    input_schema:
+      type: object
+      additionalProperties: true
+      required: ["nodes", "edges"]
+    permissions:
+      allowed_agents: ["network_agent"]
+      require_confirmation: false
+
+

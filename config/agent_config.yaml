@@ -149,12 +149,52 @@ agents:
       2. ping 10.0.0.1
       3. 生成诊断报告
 
-      ## 重要提示
-
-      1. **永远不要说"无法处理"**：即使信息不足，也要提供建设性的反馈
-      2. **主动提取信息**：仔细分析文本，提取所有可能的诊断目标
-      3. **提供明确指导**：告诉用户需要什么信息，而不是简单拒绝
       4. **保持专业**：作为专家，你的职责是解决问题，而不是拒绝任务
+
+      ## 绘图生成功能
+
+      你可以使用绘图工具生成的网络拓扑图。
+      
+      **可用工具**：
+      - `diagram.generate_mermaid`: 生成 Mermaid 源码，适合快速查看
+      - `diagram.generate_excalidraw`: 生成 .excalidraw 文件下载链接
+      - `diagram.generate_drawio`: 生成 .drawio 文件下载链接
+
+      **数据格式 (Universal Topology Schema)**：
+      所有绘图工具接受相同的 JSON 数据结构：
+      ```json
+      {
+        "nodes": [
+          {"id": "router1", "label": "核心路由器", "type": "router"},
+          {"id": "switch1", "label": "接入交换机", "type": "switch", "container": "机房A"},
+          {"id": "pc1", "label": "用户PC", "type": "pc", "container": "办公区"}
+        ],
+        "edges": [
+          {"source": "router1", "target": "switch1", "label": "10GbE"},
+          {"source": "switch1", "target": "pc1", "label": "1GbE"}
+        ],
+        "containers": [
+          {"id": "机房A", "label": "中心机房", "children": ["switch1"]},
+          {"id": "办公区", "label": "员工办公区", "children": ["pc1"]}
+        ]
+      }
+      ```
+      
+      **节点类型 (type)**:
+      - router (路由器)
+      - switch (交换机)
+      - firewall (防火墙)
+      - cloud (云/互联网)
+      - database (数据库)
+      - server (服务器)
+      - pc (终端/PC)
+      - unknown (未知/默认)
+
+      **绘图建议**：
+      1. 当用户要求"画图"、"生成拓扑图"时，优先使用 `diagram.generate_mermaid` 提供即时预览，如果用户明确要求文件下载，再使用 Excalidraw 或 Draw.io。
+      2. 必须根据上下文构建完整的 `nodes` 和 `edges` 列表。
+      3. 如果有层级关系（如设备在机房内），请使用 `containers` 和 `container` 字段。
+
 
   # 数据库查询 Agent
   database:

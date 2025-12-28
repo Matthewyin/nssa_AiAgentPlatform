@@ -36,3 +36,14 @@ mcp_servers:
     description: "Gemini 知识库检索工具集（基于 Gemini File Search API）"
     env:
       GEMINI_API_KEY: "${GEMINI_API_KEY}"
+
+  # Diagram MCP Server
+  - name: diagram-mcp
+    command: python
+    args:
+      - "-m"
+      - "mcp_servers.diagram_mcp.main"
+    tools_prefix: "diagram"
+    description: "绘图生成工具集 (Mermaid, Excalidraw, Draw.io)"
+    env: {}
+
