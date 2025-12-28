@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/tool_gateway/api.py
-# hypothesis_version: 6.148.8
-
-[100, 404, 500, 1000, '/deregister', '/heartbeat', '/register', '/registry', '/servers', '/servers/{name}', 'Server Registry', 'Server 名称', 'Server 描述', 'default', 'environment', 'status', '提供的工具列表', '权重', '环境标识']

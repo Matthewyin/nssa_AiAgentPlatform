@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/report_builder/converters/dns_converter.py
-# hypothesis_version: 6.148.8
-
-[3600, '### ❌ 解析失败', '### 解析链路', '### 📊 统计信息', '6️⃣', '?', 'A', 'AAAA', 'CNAME', 'DNS_NXDOMAIN', 'DNS_REFUSED', 'DNS_SERVFAIL', 'DNS_TIMEOUT', 'MX', 'N/A', 'NS', 'PTR', 'SOA', 'TTL', 'TXT', 'UNKNOWN', 'Unknown error', 'code', 'data', 'dns_server', 'domain', 'duration_ms', 'error', 'message', 'query_name', 'query_type', 'resolution_chain', 'resolution_time_ms', 'resolved_ips', 'success', 'target', 'ttl', 'type', 'value', '↩️', '值', '步骤', '类型', '🅰️', '🏷️', '📄', '📋', '📝', '📧', '🔗']

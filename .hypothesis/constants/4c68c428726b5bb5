@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/tool_gateway/catalog.py
-# hypothesis_version: 6.148.8
-
-['ToolCatalog', 'allowed_agents', 'bindings', 'category', 'config', 'dangerous_patterns', 'default', 'description', 'enabled', 'environment', 'input_schema', 'logical_name', 'mcp_server', 'permissions', 'physical_tool', 'priority', 'r', 'require_confirmation', 'tags', 'tool_catalog.yaml', 'tools', 'utf-8']

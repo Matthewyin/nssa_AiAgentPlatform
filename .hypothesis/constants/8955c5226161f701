@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/utils/config_manager.py
-# hypothesis_version: 6.148.8
-
-[0.7, 'LLM 实例缓存已清除', 'api_key', 'base_url', 'deepseek', 'default', 'gemini', 'llm', 'llm_config', 'max_output_tokens', 'max_tokens', 'model', 'ollama', 'openai', 'provider', 'providers', 'temperature', 'timeout', '所有 LLM 实例缓存已清除', '配置管理器已初始化']

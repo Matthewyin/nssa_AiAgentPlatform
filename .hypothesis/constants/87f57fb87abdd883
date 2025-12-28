@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/tool_gateway/router.py
-# hypothesis_version: 6.148.8
-
-[100, 150, ',', '_', 'consistent_hash', 'default_weight', 'domain', 'hash_fields', 'query', 'random', 'round_robin', 'target', 'virtual_nodes', 'weighted']

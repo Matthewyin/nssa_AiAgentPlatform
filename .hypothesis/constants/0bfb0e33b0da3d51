@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/nodes/user_input.py
-# hypothesis_version: 6.148.8
-
-[8000, '### task:', '#### Tools Available', 'current_node', 'errors', 'follow-up', 'follow_up', 'is_followup', 'langgraph', 'max_length', 'metadata', 'nodes', 'question', 'start_time', 'suggest', 'time', 'user_input', 'user_query', 'validate_input']

@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/utils/token_tracker.py
-# hypothesis_version: 6.148.8
-
-[0.0, 1.0, 3.0, 200, 1000000, '%Y-%m-%d', 'a', 'base_dir', 'categories', 'cost_usd', 'data/logs', 'default', 'dir', 'duration_ms', 'enabled', 'estimated_cost_usd', 'input', 'input_tokens', 'llm_calls', 'logging', 'model', 'node', 'optimization', 'output', 'output_tokens', 'pricing', 'request_id', 'timestamp', 'token_tracking', 'token_usage', 'total_input_tokens', 'total_output_tokens', 'user_query', 'utf-8']

@@ -51,3 +51,6 @@ data/cases/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Hypothesis 测试框架缓存
+.hypothesis/

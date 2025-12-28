@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/agents/database_agent.py
-# hypothesis_version: 6.148.8
-
-['database', 'error', 'output', 'query_description', 'result', 'success']

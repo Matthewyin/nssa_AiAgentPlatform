@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/utils/query_cache.py
-# hypothesis_version: 6.148.8
-
-[300, 3600, 'QueryCache: 缓存已清空', 'data', 'enabled', 'optimization', 'query_cache', 'result_cache_ttl', 'router_cache_ttl', 'timestamp', '查询缓存已启用']

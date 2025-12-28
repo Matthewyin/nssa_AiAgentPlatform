@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/tool_gateway/gateway.py
-# hypothesis_version: 6.148.8
-
-['ToolGateway', 'config', 'default', 'default_strategy', 'r', 'round_robin', 'routing', 'server_registry.yaml', 'strategies', 'unknown', 'utf-8']

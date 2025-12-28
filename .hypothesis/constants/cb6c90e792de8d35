@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/utils/result_validator.py
-# hypothesis_version: 6.148.8
-
-['TOOL', 'UNKNOWN', 'action_type', 'agent_plan', 'agent_plan 为空', 'first_action', 'name', 'required', 'task', 'tool', 'tool_name', '响应为空', '无法识别 action_type']

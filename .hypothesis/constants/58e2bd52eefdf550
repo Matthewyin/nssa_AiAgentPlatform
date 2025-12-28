@@ -1,4 +1,0 @@
-# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/graph.py
-# hypothesis_version: 6.148.8
-
-[500, '...', 'Error', 'Failed', 'LangGraph图编译完成', 'LangGraph工作流图创建完成', 'ReAct 循环模式工作流图创建完成', 'TOOL', '_agent', 'action', 'agent_plan', 'agents', 'completed', 'current_agent_index', 'current_step', 'database_agent', 'default_agent', 'error', 'execution_history', 'failed', 'final_answer', 'full_name', 'is_finished', 'last_observation', 'name', 'network_agent', 'next_action', 'observation', 'output', 'react_act', 'react_observe', 'react_think', 'router', 'skip', 'status', 'switch_agent', 'target_agent', 'task', 'tool', 'tool_queue', 'type', 'user_input', 'user_query', '使用 ReAct 循环模式', '使用传统模式', '失败', '错误']
