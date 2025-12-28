@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/utils/history_compressor.py
+# hypothesis_version: 6.148.8
+
+[100, 500, '\n\n执行历史:\n', ' → ', '(\\d+(?:\\.\\d+)?)\\s*ms', '.', '...', 'N/A', 'action', 'default', 'enabled', 'error', 'failed', 'history_truncation', 'observation', 'optimization', 'summary_max_length', 'tool', 'window_size', '失败', '成功', '无结果', '未知工具', '错误']

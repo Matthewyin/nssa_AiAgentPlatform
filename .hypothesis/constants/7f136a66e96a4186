@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/nodes/react_think.py
+# hypothesis_version: 6.148.8
+
+['"', '.', 'ACTION', 'FINISH', 'LLM 决定完成任务', 'PARAMS', 'PARAMS:\\s*', 'THOUGHT', 'TOOL', '\\', 'action', 'action_type', 'agent_plan', 'agents', 'batch_planning', 'batch_tools', 'config_key', 'content', 'current_agent_index', 'current_node', 'current_step', 'description', 'enabled', 'errors', 'execution_history', 'full_name', 'is_finished', 'last_observation', 'max_batch_size', 'max_iterations', 'metadata', 'name', 'network', 'network_agent', 'next_action', 'optimization', 'params', 'react_think', 'result_validation', 'skip_first_think', 'system_prompt', 'target_agent', 'task', 'text', 'thought', 'tool', 'tool_name', 'tool_queue', 'tools', 'tools_prefix', 'user_query', '{', '}', '不存在', '检测到工具幻觉，标记为 FINISH']

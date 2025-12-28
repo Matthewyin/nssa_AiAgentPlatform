@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/tool_gateway/registry.py
+# hypothesis_version: 6.148.8
+
+[100.0, 100, 180, 'ServerRegistry', 'config', 'config_ref', 'default', 'description', 'environment', 'failed_requests', 'health_check', 'healthy', 'healthy_threshold', 'heartbeat', 'last_heartbeat', 'name', 'offline', 'r', 'registered_at', 'server_registry.yaml', 'static_servers', 'stats', 'status', 'success_rate', 'timeout_seconds', 'tools', 'total_requests', 'unhealthy', 'unhealthy_threshold', 'unknown', 'utf-8', 'weight', '心跳检查任务已停止', '心跳检查任务已启动']

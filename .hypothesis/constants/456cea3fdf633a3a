@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/report_builder/converters/mtr_converter.py
+# hypothesis_version: 6.148.8
+
+[20.0, '### 路径详情', '### 错误信息', '*', '-', '...', '100%', '> 请检查网络连接和目标地址。', '> 连接超时，请检查目标地址是否正确。', '?', 'COMMAND_NOT_FOUND', 'IP', 'N/A', 'PERMISSION_DENIED', 'TCP_TIMEOUT', 'UNKNOWN', 'Unknown error', '\\*', 'avg', 'avg_latency_ms', 'code', 'data', 'domain', 'error', 'hop_number', 'hops', 'hostname', 'ip', 'is_high_loss', 'is_timeout', 'latency_ms', 'loss_percent', 'message', 'overall_loss_percent', 'success', 'summary', 'target', 'target_reached', 'total_hops', '丢包率', '主机名', '延迟 (avg)', '状态', '跳数']

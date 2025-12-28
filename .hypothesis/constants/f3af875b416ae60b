@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/report_builder/converters/tls_converter.py
+# hypothesis_version: 6.148.8
+
+[443, '### ⏱️ 时间分解', '### ❌ TLS 探测失败', '### 📜 证书详情', '### 🔗 连接信息', '**总计**', ', ', '...', 'N/A', 'T', 'TCP 连接', 'TCP_REFUSED', 'TCP_TIMEOUT', 'TLS 握手', 'TLS_CERT_EXPIRED', 'TLS_CERT_INVALID', 'TLS_HANDSHAKE_FAILED', 'UNKNOWN', 'Unknown error', 'alpn', 'certificate', 'cipher_suite', 'cn', 'code', 'connection', 'data', 'days_remaining', 'dns_names', 'domain', 'error', 'fingerprint_sha256', 'ip', 'is_expired', 'is_expiring_soon', 'is_mutual_tls', 'issuer', 'key_algorithm', 'key_size', 'message', 'not_after', 'not_before', 'o', 'port', 'protocol', 'security', 'server_name', 'subject', 'success', 'target', 'tcp_connect_ms', 'timing', 'tls_handshake_ms', 'total_ms', 'warnings', '值', '剩余天数', '域名 (CN)', '备用名称', '字段', '密钥算法', '指纹 (SHA256)', '有效期', '组织 (O)', '耗时', '阶段', '颁发者']

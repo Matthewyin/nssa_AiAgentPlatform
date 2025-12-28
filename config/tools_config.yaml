@@ -6,34 +6,41 @@ tools:
   network:
     ping:
       name: "network.ping"
-      description: "使用ping命令检查目标主机的可达性和网络延迟"
+      description: "使用 ICMP ping 检查目标主机的可达性和网络延迟。返回丢包率、最小/最大/平均延迟等统计信息。"
       parameters:
         target:
           type: "string"
-          description: "目标主机的IP地址或域名"
+          description: "目标主机的 IP 地址或域名"
           required: true
         count:
           type: "integer"
-          description: "发送ping包的数量"
+          description: "发送 ping 包的数量"
           default: 4
           min: 1
           max: 100
-      timeout: 30  # 工具执行超时时间(秒)
+        timeout:
+          type: "integer"
+          description: "超时时间(秒)"
+          default: 10
+          min: 1
+          max: 60
+      timeout: 30
       runner:
-        type: "netprobe"           # 使用 Go 探测 CLI；可切换为 python 以兼容旧实现
-        command: "${NETPROBE_BIN}" # 留空则默认 netprobe
+        type: "netprobe"
+        command: "${NETPROBE_BIN}"
         subcommand: "ping"
         args:
           target: "--target"
           count: "--count"
+          timeout: "--timeout"
 
     traceroute:
       name: "network.traceroute"
-      description: "使用traceroute命令追踪到目标主机的网络路径"
+      description: "路由追踪：追踪到目标主机的网络路径，返回每跳的 IP 地址、主机名和延迟。"
       parameters:
         target:
           type: "string"
-          description: "目标主机的IP地址或域名"
+          description: "目标主机的 IP 地址或域名"
           required: true
         max_hops:
           type: "integer"
@@ -41,7 +48,13 @@ tools:
           default: 30
           min: 1
           max: 64
-      timeout: 60  # traceroute需要更长时间
+        timeout:
+          type: "integer"
+          description: "超时时间(秒)"
+          default: 60
+          min: 10
+          max: 120
+      timeout: 120
       runner:
         type: "netprobe"
         command: "${NETPROBE_BIN}"
@@ -49,10 +62,11 @@ tools:
         args:
           target: "--target"
           max_hops: "--max-hops"
+          timeout: "--timeout"
 
     nslookup:
       name: "network.nslookup"
-      description: "使用nslookup命令查询域名的DNS记录"
+      description: "DNS 解析查询：返回完整的解析链路（包括 CNAME 跳转）、每条记录的 TTL、使用的 DNS 服务器、解析耗时。支持多种记录类型查询。"
       parameters:
         target:
           type: "string"
@@ -60,10 +74,20 @@ tools:
           required: true
         record_type:
           type: "string"
-          description: "DNS记录类型"
+          description: "DNS 记录类型"
           default: "A"
-          enum: ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"]
-      timeout: 10
+          enum: ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA", "PTR", "SRV"]
+        dns_server:
+          type: "string"
+          description: "指定 DNS 服务器（可选，默认使用系统 DNS）"
+          required: false
+        timeout:
+          type: "integer"
+          description: "超时时间(秒)"
+          default: 10
+          min: 1
+          max: 30
+      timeout: 15
       runner:
         type: "netprobe"
         command: "${NETPROBE_BIN}"
@@ -71,14 +95,16 @@ tools:
         args:
           target: "--target"
           record_type: "--record-type"
+          dns_server: "--dns-server"
+          timeout: "--timeout"
 
     mtr:
       name: "network.mtr"
-      description: "使用mtr命令结合ping和traceroute功能,实时监控网络路径质量"
+      description: "MTR 网络路径追踪：结合 ping 和 traceroute 功能，返回每跳的结构化数据（IP、主机名、丢包率、延迟统计 min/max/avg/std_dev）。自动标识高丢包跳点（>20%）和超时跳点。"
       parameters:
         target:
           type: "string"
-          description: "目标主机的IP地址或域名"
+          description: "目标主机的 IP 地址或域名"
           required: true
         count:
           type: "integer"
@@ -92,37 +118,50 @@ tools:
           default: 10
           min: 1
           max: 100
-      timeout: 60  # mtr需要较长时间收集数据
+        timeout:
+          type: "integer"
+          description: "超时时间(秒)"
+          default: 60
+          min: 10
+          max: 300
+      timeout: 120
       runner:
         type: "netprobe"
         command: "${NETPROBE_BIN}"
         subcommand: "mtr"
-        use_sudo: true           # mtr 需要 root/cap_net_raw，可按需关闭并为 mtr 设置 setcap
+        use_sudo: true
         args:
           target: "--target"
           count: "--count"
           report_cycles: "--report-cycles"
+          timeout: "--timeout"
 
     tcp:
       name: "network.tcp"
-      description: "TCP 探测：建立 TCP 连接并返回握手耗时、错误原因"
+      description: "TCP 探测：建立 TCP 连接并返回握手耗时。用于检测端口是否开放、连接是否被拒绝或超时。支持重试机制。"
       parameters:
         host:
           type: "string"
-          description: "目标主机"
+          description: "目标主机（域名或 IP）"
           required: true
         port:
           type: "integer"
           description: "目标端口"
           required: true
+          min: 1
+          max: 65535
         timeout:
           type: "integer"
           description: "超时时间(秒)"
           default: 10
+          min: 1
+          max: 60
         retry:
           type: "integer"
           description: "重试次数"
           default: 0
+          min: 0
+          max: 5
       timeout: 30
       runner:
         type: "netprobe"
@@ -136,39 +175,44 @@ tools:
 
     tls:
       name: "network.tls"
-      description: "TLS 探测：单向/双向握手，验证证书与握手耗时"
+      description: "TLS 探测：执行 TLS 握手并返回详细的证书信息（主题、颁发者、有效期、剩余天数、SHA256 指纹）、连接信息（协议版本、加密套件、是否 mTLS）、时间分解（TCP 连接、TLS 握手）。证书即将过期（<30天）时自动标记警告。"
       parameters:
         host:
           type: "string"
-          description: "目标主机"
+          description: "目标主机（域名或 IP）"
           required: true
         port:
           type: "integer"
           description: "目标端口"
           required: true
+          default: 443
+          min: 1
+          max: 65535
         server_name:
           type: "string"
-          description: "SNI/证书校验主机名"
+          description: "SNI 主机名（用于证书校验，默认使用 host 参数）"
           required: false
         timeout:
           type: "integer"
           description: "超时时间(秒)"
           default: 10
+          min: 1
+          max: 60
         insecure:
           type: "boolean"
-          description: "跳过证书校验"
+          description: "跳过证书校验（用于自签名证书）"
           default: false
         ca_cert:
           type: "string"
-          description: "根证书路径"
+          description: "自定义根证书路径"
           required: false
         client_cert:
           type: "string"
-          description: "客户端证书路径(双向认证)"
+          description: "客户端证书路径（用于双向 TLS/mTLS）"
           required: false
         client_key:
           type: "string"
-          description: "客户端私钥路径(双向认证)"
+          description: "客户端私钥路径（用于双向 TLS/mTLS）"
           required: false
       timeout: 30
       runner:
@@ -187,36 +231,49 @@ tools:
 
     http:
       name: "network.http"
-      description: "HTTP 探测：发起 HTTP/HTTPS 请求并验证状态码与响应"
+      description: "HTTP 探测：发起 HTTP/HTTPS 请求并验证状态码与响应。支持完整的时间分解（DNS、TCP、TLS、等待、传输）、重定向链路追踪、关键响应头提取。"
       parameters:
         url:
           type: "string"
-          description: "目标 URL"
+          description: "目标 URL（支持 http:// 和 https://）"
           required: true
         method:
           type: "string"
           description: "HTTP 方法"
           default: "GET"
+          enum: ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]
         headers:
           type: "object"
-          description: "请求头键值对"
+          description: "请求头键值对，如 {\"Authorization\": \"Bearer xxx\"}"
           required: false
         body:
           type: "string"
-          description: "请求体"
+          description: "请求体（用于 POST/PUT 等方法）"
           required: false
         timeout:
           type: "integer"
           description: "超时时间(秒)"
           default: 15
+          min: 1
+          max: 300
         expect_status:
           type: "integer"
-          description: "预期状态码(可选)"
+          description: "预期状态码，不匹配时标记为失败"
           required: false
         expect_contains:
           type: "string"
-          description: "响应体期望包含的字符串(可选)"
+          description: "响应体期望包含的字符串"
           required: false
+        follow_redirects:
+          type: "boolean"
+          description: "是否跟随重定向"
+          default: true
+        max_redirects:
+          type: "integer"
+          description: "最大重定向次数"
+          default: 10
+          min: 0
+          max: 20
       timeout: 60
       runner:
         type: "netprobe"
@@ -230,6 +287,59 @@ tools:
           expect_contains: "--expect-contains"
           body: "--body"
           headers: "--headers"
+          follow_redirects: "--follow-redirects"
+          max_redirects: "--max-redirects"
+
+    diagnose:
+      name: "network.diagnose"
+      description: "综合网络诊断：一键执行完整的网络诊断链（DNS → TCP → TLS → HTTP），返回包含所有探测结果的综合报告，并生成诊断结论和建议。适用于快速排查目标服务的连通性问题。"
+      parameters:
+        target:
+          type: "string"
+          description: "目标域名或 URL（如 example.com 或 https://example.com/api）"
+          required: true
+        port:
+          type: "integer"
+          description: "目标端口（默认根据协议自动选择：HTTP=80, HTTPS=443）"
+          required: false
+          default: 443
+          min: 1
+          max: 65535
+        skip:
+          type: "array"
+          description: "跳过的探测步骤列表，可选值：dns, tcp, tls, http, mtr"
+          required: false
+        parallel:
+          type: "boolean"
+          description: "是否并行探测多个 IP（当 DNS 解析出多个 IP 时）"
+          default: false
+        timeout:
+          type: "integer"
+          description: "总超时时间(秒)"
+          default: 60
+          min: 10
+          max: 300
+        include_mtr:
+          type: "boolean"
+          description: "是否包含 MTR 路径追踪（耗时较长）"
+          default: false
+        probe_id:
+          type: "string"
+          description: "探测源标识（用于区分不同探测点）"
+          required: false
+      timeout: 120
+      runner:
+        type: "netprobe"
+        command: "${NETPROBE_BIN}"
+        subcommand: "diagnose"
+        args:
+          target: "--target"
+          port: "--port"
+          skip: "--skip"
+          parallel: "--parallel"
+          timeout: "--timeout"
+          include_mtr: "--mtr"
+          probe_id: "--probe-id"
 
   # 绘图生成工具
   diagram:

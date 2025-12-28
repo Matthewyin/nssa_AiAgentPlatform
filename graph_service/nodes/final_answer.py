@@ -243,6 +243,29 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
         return "抱歉，无法生成综合分析。"
 
 
+def _is_network_tool(tool_name: str) -> bool:
+    """
+    判断是否为网络探测工具
+    
+    Args:
+        tool_name: 工具名称
+        
+    Returns:
+        是否为网络探测工具
+    """
+    network_tools = [
+        "network.nslookup", "network.dns", "nslookup", "dns",
+        "network.tls", "tls",
+        "network.http", "http",
+        "network.mtr", "mtr",
+        "network.diagnose", "diagnose",
+        "network.ping", "ping",
+        "network.tcp", "tcp",
+        "network.traceroute", "traceroute"
+    ]
+    return tool_name.lower() in [t.lower() for t in network_tools]
+
+
 def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], result_json: str) -> str:
     """
     格式化工具结果为三段式输出
@@ -445,13 +468,19 @@ def final_answer_node(state: GraphState) -> GraphState:
                     tool_name = action.get("tool")
                     params = action.get("params", {})
                     observation = record.get("observation", "")
+                    
+                    # 检查是否有预生成的 Markdown 输出（网络探测工具）
+                    markdown_output = record.get("markdown_output")
 
                     if tool_count > 1:
                         final_answer += f"\n**--- 工具 {i}/{tool_count} ---**\n"
 
+                    # 优先使用预生成的 Markdown 输出（网络探测工具）
+                    if markdown_output and _is_network_tool(tool_name):
+                        final_answer += f"\n{markdown_output}\n"
                     # 从观察结果中提取工具返回的 JSON
                     # 观察结果格式：工具 network.ping 执行成功。结果:\n{json}
-                    if "执行成功" in observation and "结果:" in observation:
+                    elif "执行成功" in observation and "结果:" in observation:
                         try:
                             result_json = observation.split("结果:")[1].strip()
                             formatted = _format_tool_result_three_sections(tool_name, params, result_json)
@@ -487,6 +516,7 @@ def final_answer_node(state: GraphState) -> GraphState:
                         tool_name = action.get("tool", "")
                         params = action.get("params", {})
                         observation = record.get("observation", "")
+                        structured_result = record.get("structured_result")
 
                         # 工具标题
                         final_answer += f"#### 工具 {tool_name}\n\n"
@@ -496,10 +526,18 @@ def final_answer_node(state: GraphState) -> GraphState:
                             params_display = ", ".join(f"`{k}={v}`" for k, v in params.items())
                             final_answer += f"**参数**: {params_display}\n\n"
 
-                        # 显示完整结果（使用 Markdown 表格或代码块）
+                        # 显示完整结果
                         final_answer += "**结果**:\n\n"
-                        formatted_result = format_full_result(tool_name, observation)
-                        final_answer += formatted_result
+                        
+                        # 如果有结构化结果，优先使用 JSON 格式显示
+                        if structured_result:
+                            final_answer += "```json\n"
+                            final_answer += json.dumps(structured_result, ensure_ascii=False, indent=2)
+                            final_answer += "\n```\n"
+                        else:
+                            # 使用原有的格式化方法
+                            formatted_result = format_full_result(tool_name, observation)
+                            final_answer += formatted_result
                         final_answer += "\n\n"
                     
                     final_answer += "</details>\n\n"

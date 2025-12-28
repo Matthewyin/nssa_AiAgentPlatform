@@ -10,14 +10,81 @@ import (
 	"netprobe/pkg/probe"
 )
 
+// Global configuration
+var (
+	outputFormat string // json or json-pretty
+	probeID      string // probe source identifier
+	probeIP      string // probe source IP (optional)
+	probeLocation string // probe source location (optional, from env)
+	probeISP     string // probe source ISP (optional, from env)
+)
+
+func init() {
+	// Read probe metadata from environment variables
+	probeLocation = os.Getenv("NETPROBE_LOCATION")
+	probeISP = os.Getenv("NETPROBE_ISP")
+	probeIP = os.Getenv("NETPROBE_IP")
+}
+
+// parseGlobalFlags extracts global flags from args and returns remaining args
+func parseGlobalFlags(args []string) []string {
+	remaining := []string{}
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "--output-format":
+			if i+1 < len(args) {
+				outputFormat = args[i+1]
+				i += 2
+			} else {
+				i++
+			}
+		case "--probe-id":
+			if i+1 < len(args) {
+				probeID = args[i+1]
+				i += 2
+			} else {
+				i++
+			}
+		default:
+			// Check for --output-format=value or --probe-id=value format
+			if strings.HasPrefix(args[i], "--output-format=") {
+				outputFormat = strings.TrimPrefix(args[i], "--output-format=")
+				i++
+			} else if strings.HasPrefix(args[i], "--probe-id=") {
+				probeID = strings.TrimPrefix(args[i], "--probe-id=")
+				i++
+			} else {
+				remaining = append(remaining, args[i])
+				i++
+			}
+		}
+	}
+	
+	// Set default output format
+	if outputFormat == "" {
+		outputFormat = "json"
+	}
+	
+	return remaining
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, usage())
 		os.Exit(1)
 	}
 
-	cmd := os.Args[1]
-	args := os.Args[2:]
+	// Parse global flags first
+	allArgs := parseGlobalFlags(os.Args[1:])
+	
+	if len(allArgs) < 1 {
+		fmt.Fprintln(os.Stderr, usage())
+		os.Exit(1)
+	}
+
+	cmd := allArgs[0]
+	args := allArgs[1:]
 
 	var res probe.Result
 	var err error
@@ -81,10 +148,26 @@ func main() {
 		target := fs.String("target", "", "domain to query")
 		recordType := fs.String("record-type", "A", "DNS record type")
 		timeout := fs.Int("timeout", 10, "timeout seconds")
+		unified := fs.Bool("unified", true, "use unified output format (default: true)")
 		_ = fs.Parse(args)
 		if *target == "" {
 			err = fmt.Errorf("target is required")
 			break
+		}
+		if *unified {
+			// Use new unified output format
+			unifiedRes := probe.NslookupUnified(probe.NslookupOptions{
+				Target:     *target,
+				RecordType: *recordType,
+				TimeoutSec: *timeout,
+				Tool:       "network.nslookup",
+			})
+			// Set source info if probe-id is set
+			if probeID != "" {
+				unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+			}
+			printUnifiedJSON(unifiedRes)
+			return
 		}
 		res = probe.Nslookup(probe.NslookupOptions{
 			Target:     *target,
@@ -122,10 +205,31 @@ func main() {
 		caCert := fs.String("ca-cert", "", "CA certificate path")
 		clientCert := fs.String("client-cert", "", "client certificate path")
 		clientKey := fs.String("client-key", "", "client key path")
+		unified := fs.Bool("unified", true, "use unified output format (default: true)")
 		_ = fs.Parse(args)
 		if *host == "" || *port == 0 {
 			err = fmt.Errorf("host and port are required")
 			break
+		}
+		if *unified {
+			// Use new unified output format
+			unifiedRes := probe.TLSProbeUnified(probe.TLSOptions{
+				Host:       *host,
+				Port:       *port,
+				ServerName: *serverName,
+				TimeoutSec: *timeout,
+				Insecure:   *insecure,
+				CACert:     *caCert,
+				ClientCert: *clientCert,
+				ClientKey:  *clientKey,
+				Tool:       "network.tls",
+			})
+			// Set source info if probe-id is set
+			if probeID != "" {
+				unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+			}
+			printUnifiedJSON(unifiedRes)
+			return
 		}
 		res = probe.TLSProbe(probe.TLSOptions{
 			Host:       *host,
@@ -179,6 +283,46 @@ func main() {
 			Tool:           "network.http",
 		})
 
+	case "diagnose":
+		fs := flag.NewFlagSet("diagnose", flag.ExitOnError)
+		target := fs.String("target", "", "target domain, IP, or URL")
+		port := fs.Int("port", 443, "target port")
+		timeout := fs.Int("timeout", 30, "timeout seconds")
+		skipSteps := fs.String("skip", "", "comma-separated steps to skip: dns,tcp,tls,http,mtr")
+		parallel := fs.Bool("parallel", false, "probe multiple IPs in parallel")
+		includeHTTP := fs.Bool("http", false, "include HTTP probe")
+		includeMTR := fs.Bool("mtr", false, "include MTR probe")
+		_ = fs.Parse(args)
+		if *target == "" {
+			err = fmt.Errorf("target is required")
+			break
+		}
+		// Parse skip steps
+		var skipList []string
+		if *skipSteps != "" {
+			skipList = strings.Split(*skipSteps, ",")
+			for i := range skipList {
+				skipList[i] = strings.TrimSpace(skipList[i])
+			}
+		}
+		// Execute diagnose
+		unifiedRes := probe.Diagnose(probe.DiagnoseOptions{
+			Target:      *target,
+			Port:        *port,
+			TimeoutSec:  *timeout,
+			Skip:        skipList,
+			Parallel:    *parallel,
+			IncludeHTTP: *includeHTTP,
+			IncludeMTR:  *includeMTR,
+			Tool:        "network.diagnose",
+		})
+		// Set source info if probe-id is set
+		if probeID != "" {
+			unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+		}
+		printUnifiedJSON(unifiedRes)
+		return
+
 	default:
 		err = fmt.Errorf("unknown subcommand: %s", cmd)
 	}
@@ -205,7 +349,59 @@ func (m *multiString) Set(val string) error {
 }
 
 func printJSON(res probe.Result) {
-	data, err := json.MarshalIndent(res, "", "  ")
+	// Add source info if probe-id is set
+	if probeID != "" {
+		if res.Details == nil {
+			res.Details = make(map[string]any)
+		}
+		source := map[string]string{
+			"probe_id": probeID,
+		}
+		if probeIP != "" {
+			source["ip"] = probeIP
+		}
+		if probeLocation != "" {
+			source["location"] = probeLocation
+		}
+		if probeISP != "" {
+			source["isp"] = probeISP
+		}
+		res.Details["source"] = source
+	}
+
+	var data []byte
+	var err error
+	
+	switch outputFormat {
+	case "json-pretty":
+		data, err = json.MarshalIndent(res, "", "  ")
+	case "json":
+		fallthrough
+	default:
+		data, err = json.Marshal(res)
+	}
+	
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "marshal result failed: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println(string(data))
+}
+
+// printUnifiedJSON prints a UnifiedResult as JSON
+func printUnifiedJSON(res *probe.UnifiedResult) {
+	var data []byte
+	var err error
+	
+	switch outputFormat {
+	case "json-pretty":
+		data, err = json.MarshalIndent(res, "", "  ")
+	case "json":
+		fallthrough
+	default:
+		data, err = json.Marshal(res)
+	}
+	
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "marshal result failed: %v\n", err)
 		os.Exit(1)
@@ -214,15 +410,34 @@ func printJSON(res probe.Result) {
 }
 
 func usage() string {
-	return `netprobe <subcommand> [options]
+	return `netprobe <subcommand> [global-options] [options]
+
+global options:
+  --output-format <format>   Output format: json (default) or json-pretty
+  --probe-id <id>            Probe source identifier
+
+environment variables:
+  NETPROBE_LOCATION          Probe source location
+  NETPROBE_ISP               Probe source ISP
+  NETPROBE_IP                Probe source IP
 
 subcommands:
   ping         --target <host> [--count 4] [--timeout 10]
   trace        --target <host> [--max-hops 30] [--timeout 60]
   mtr          --target <host> [--count 10] [--report-cycles 10] [--timeout 60]
-  nslookup     --target <domain> [--record-type A] [--timeout 10]
+  nslookup     --target <domain> [--record-type A] [--timeout 10] [--unified true]
   tcp          --host <host> --port <port> [--timeout 10] [--retry 0]
-  tls          --host <host> [--port 443] [--server-name <sni>] [--timeout 10] [--insecure] [--ca-cert path] [--client-cert path --client-key path]
+  tls          --host <host> [--port 443] [--server-name <sni>] [--timeout 10] [--insecure] [--ca-cert path] [--client-cert path --client-key path] [--unified true]
   http         --url <url> [--method GET] [--timeout 15] [--expect-status <code>] [--expect-contains <str>] [--body <data>] [--headers <json>] [--header "K: V"]
+  diagnose     --target <domain|url> [--port 443] [--timeout 30] [--skip dns,tcp,tls,http,mtr] [--parallel] [--http] [--mtr]
+
+examples:
+  netprobe ping --target example.com
+  netprobe --output-format json-pretty ping --target example.com
+  netprobe --probe-id probe-beijing-01 tcp --host example.com --port 443
+  netprobe --output-format json-pretty nslookup --target example.com --record-type A
+  netprobe diagnose --target example.com --port 443
+  netprobe diagnose --target https://example.com --http --parallel
+  netprobe diagnose --target example.com --skip tls,http
 `
 }

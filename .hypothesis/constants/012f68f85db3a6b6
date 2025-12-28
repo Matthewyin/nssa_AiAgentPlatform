@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/report_builder/converters/http_converter.py
+# hypothesis_version: 6.148.8
+
+[100, 200, 300, 400, 500, 1024, '### ↪️ 重定向链', '### ⏱️ 时间分解', '### ❌ 请求失败', '### 📋 响应信息', '...', '?', 'CF-Ray', 'Cache-Control', 'Content-Length', 'Content-Type', 'DNS 解析', 'DNS_TIMEOUT', 'GET', 'HTTP_ERROR', 'HTTP_TIMEOUT', 'N/A', 'Server', 'TCP 连接', 'TCP_REFUSED', 'TCP_TIMEOUT', 'TLS 握手', 'TLS_HANDSHAKE_FAILED', 'UNKNOWN', 'Unknown error', 'X-Cache', 'X-Request-Id', '```', 'code', 'content_encoding', 'content_length', 'content_transfer_ms', 'content_type', 'data', 'dns_lookup_ms', 'error', 'headers', 'location', 'message', 'method', 'redirects', 'request', 'response', 'server', 'status_code', 'status_text', 'success', 'target', 'tcp_connect_ms', 'timing', 'tls_handshake_ms', 'total_ms', 'url', 'waiting_ms', '↪️', '─', '值', '内容传输', '压缩', '字段', '步骤', '状态码', '目标', '等待响应']

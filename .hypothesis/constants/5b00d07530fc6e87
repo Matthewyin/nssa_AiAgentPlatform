@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/utils/logger.py
+# hypothesis_version: 6.148.8
+
+['00:00', '30 days', 'INFO', 'LOG_LEVEL', '__main__', 'app', 'base_dir', 'categories', 'colorize', 'config', 'console', 'data/logs', 'dir', 'enabled', 'filename_pattern', 'format', 'level', 'logging', 'logging_config.yaml', 'r', 'retention', 'rotation', 'utf-8']

@@ -2,10 +2,120 @@
 ReAct Observe Node
 观察节点：记录执行历史，更新状态，提前终止判断
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from loguru import logger
 from ..state import GraphState
 from datetime import datetime
+import json
+
+
+def _is_network_tool(tool_name: str) -> bool:
+    """
+    判断是否为网络探测工具
+    
+    Args:
+        tool_name: 工具名称
+        
+    Returns:
+        是否为网络探测工具
+    """
+    network_tools = [
+        "network.nslookup", "network.dns", "nslookup", "dns",
+        "network.tls", "tls",
+        "network.http", "http",
+        "network.mtr", "mtr",
+        "network.diagnose", "diagnose",
+        "network.ping", "ping",
+        "network.tcp", "tcp",
+        "network.traceroute", "traceroute"
+    ]
+    return tool_name.lower() in [t.lower() for t in network_tools]
+
+
+def _extract_json_from_observation(observation: str) -> Optional[Dict[str, Any]]:
+    """
+    从观察结果中提取 JSON 数据
+    
+    Args:
+        observation: 观察结果字符串
+        
+    Returns:
+        解析后的 JSON 字典，如果解析失败则返回 None
+    """
+    if not observation:
+        return None
+    
+    # 尝试从 "结果:" 后面提取 JSON
+    result_markers = ["结果:", "结果：", "Result:", "result:"]
+    json_str = observation
+    
+    for marker in result_markers:
+        if marker in observation:
+            json_str = observation.split(marker, 1)[1].strip()
+            break
+    
+    # 尝试解析 JSON
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        # 尝试找到 JSON 对象的开始和结束
+        start_idx = json_str.find('{')
+        if start_idx == -1:
+            return None
+        
+        # 找到匹配的结束括号
+        depth = 0
+        end_idx = -1
+        in_string = False
+        escape_next = False
+        
+        for i, char in enumerate(json_str[start_idx:], start_idx):
+            if escape_next:
+                escape_next = False
+                continue
+            if char == '\\' and in_string:
+                escape_next = True
+                continue
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    end_idx = i + 1
+                    break
+        
+        if end_idx > start_idx:
+            try:
+                return json.loads(json_str[start_idx:end_idx])
+            except json.JSONDecodeError:
+                return None
+    
+    return None
+
+
+def _convert_to_markdown(tool_name: str, result: Dict[str, Any]) -> Optional[str]:
+    """
+    将工具结果转换为 Markdown 格式
+    
+    Args:
+        tool_name: 工具名称
+        result: 结构化的探测结果
+        
+    Returns:
+        Markdown 格式的字符串，如果转换失败则返回 None
+    """
+    try:
+        from ..report_builder import MarkdownConverter
+        converter = MarkdownConverter()
+        return converter.convert(tool_name, result)
+    except Exception as e:
+        logger.warning(f"Markdown 转换失败: {e}")
+        return None
 
 
 def _load_early_termination_config() -> Dict[str, Any]:
@@ -170,6 +280,23 @@ async def react_observe_node(state: GraphState) -> GraphState:
         next_action = state.get("next_action", {})
         last_observation = state.get("last_observation", "")
         
+        # ========== Markdown 转换（网络探测工具） ==========
+        tool_name = next_action.get("tool_name", "")
+        markdown_output = None
+        structured_result = None
+        
+        if next_action.get("action_type") == "TOOL" and _is_network_tool(tool_name):
+            # 尝试从观察结果中提取 JSON
+            structured_result = _extract_json_from_observation(last_observation)
+            
+            if structured_result:
+                # 转换为 Markdown
+                markdown_output = _convert_to_markdown(tool_name, structured_result)
+                if markdown_output:
+                    logger.info(f"成功将 {tool_name} 结果转换为 Markdown")
+                else:
+                    logger.debug(f"Markdown 转换返回空结果: {tool_name}")
+        
         # 构建执行记录
         record = {
             "step": state["current_step"],
@@ -183,13 +310,19 @@ async def react_observe_node(state: GraphState) -> GraphState:
             "timestamp": datetime.now().isoformat()
         }
         
+        # 添加 Markdown 输出和结构化数据到记录中
+        if markdown_output:
+            record["markdown_output"] = markdown_output
+        if structured_result:
+            record["structured_result"] = structured_result
+        
         # 添加到执行历史
         if "execution_history" not in state or state["execution_history"] is None:
             state["execution_history"] = []
         
         state["execution_history"].append(record)
         
-        logger.info(f"记录步骤 {state['current_step']}: action={next_action.get('action_type')}, tool={next_action.get('tool_name')}")
+        logger.info(f"记录步骤 {state['current_step']}: action={next_action.get('action_type')}, tool={next_action.get('tool_name')}, has_markdown={markdown_output is not None}")
         
         # ========== 提前终止判断（第三阶段优化） ==========
         # 如果工具执行成功且满足提前终止条件，直接标记完成，跳过下一次 Think

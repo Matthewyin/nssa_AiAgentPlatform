@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/mcp_manager/client_manager.py
+# hypothesis_version: 6.148.8
+
+[1.0, '.', 'args', 'command', 'env', 'mcp_servers', 'name', 'tools_prefix']

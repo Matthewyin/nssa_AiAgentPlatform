@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/agents/base_agent.py
+# hypothesis_version: 6.148.8
+
+['PARAMS:\\s*(\\{.+?\\})', 'TOOL:\\s*(\\S+)', '`', 'afunc', 'agent_default', 'agent_executor', 'agents', 'all_results', 'count', 'dns', 'error', 'func', 'ip', 'ip地址', 'langchain', 'max_iterations', 'mtr', 'mtr\\s+(\\S+)', 'network.mtr', 'network.nslookup', 'network.ping', 'network.traceroute', 'nslookup', 'output', 'params', 'ping', 'ping\\s+(\\S+)', 'result', 'success', 'system_prompt', 'target', 'tool', 'tool_name', 'tools_used', 'trace', 'traceroute', '你是一个有用的AI助手。', '查到', '返回']

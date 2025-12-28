@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/agents/network_diag_agent.py
+# hypothesis_version: 6.148.8
+
+['diagnosis', 'error', 'issue_description', 'network_diag', 'output', 'success', 'target']

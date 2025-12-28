@@ -1,0 +1,4 @@
+# file: /Users/matthewyin/Coding/AIAgentPlatform/graph_service/report_builder/converters/generic_converter.py
+# hypothesis_version: 6.148.8
+
+['### 详细数据', '### 错误信息', 'N/A', 'data', 'domain', 'duration_ms', 'error', 'ip', 'json', 'port', 'success', 'target', 'tool', 'unknown', 'url']
