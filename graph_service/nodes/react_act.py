@@ -228,6 +228,41 @@ async def react_act_node(state: GraphState) -> GraphState:
                         f"自动补全 mysql database 参数时出现异常: {str(e)}"
                     )
 
+            # 对 network 工具进行参数修正（LLM 可能输出错误的参数名）
+            if tool_name.startswith("network."):
+                try:
+                    logger.debug(f"检查 network 工具参数修正: tool={tool_name}, params={params}")
+                    if not isinstance(params, dict):
+                        params = {}
+                    
+                    # 参数名映射：LLM 可能输出的错误名称 -> 正确名称
+                    param_corrections = {
+                        # ping/traceroute/nslookup/mtr 使用 target
+                        "host": "target",      # LLM 可能错误使用 host
+                        "hostname": "target",  # LLM 可能错误使用 hostname
+                        "ip": "target",        # LLM 可能错误使用 ip
+                        "address": "target",   # LLM 可能错误使用 address
+                        "domain": "target",    # LLM 可能错误使用 domain
+                    }
+                    
+                    # 需要 target 参数的工具
+                    target_tools = ["network.ping", "network.traceroute", "network.nslookup", "network.mtr"]
+                    
+                    if tool_name in target_tools:
+                        # 如果没有 target 参数，尝试从其他参数名中获取
+                        if "target" not in params:
+                            for wrong_name, correct_name in param_corrections.items():
+                                if wrong_name in params:
+                                    params[correct_name] = params.pop(wrong_name)
+                                    logger.info(f"参数修正: {wrong_name} -> {correct_name} = {params[correct_name]}")
+                                    break
+                            else:
+                                logger.debug(f"未找到需要修正的参数，当前参数: {list(params.keys())}")
+                        else:
+                            logger.debug(f"参数已包含 target，无需修正")
+                except Exception as e:
+                    logger.warning(f"修正 network 工具参数时出现异常: {str(e)}")
+
             # 对 diagram 工具进行参数修复（当 nodes/edges 缺失时尝试从原始输出中提取）
             if tool_name.startswith("diagram."):
                 try:

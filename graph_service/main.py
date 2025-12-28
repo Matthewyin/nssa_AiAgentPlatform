@@ -212,7 +212,8 @@ async def chat(request: ChatRequest):
             "rag_result": None,
             "final_answer": "",
             "errors": [],
-            "metadata": {}
+            "metadata": {},
+            "tool_queue": []  # 批量规划工具队列
         }
         
         # 执行图

@@ -231,9 +231,8 @@ tools:
           body: "--body"
           headers: "--headers"
 
-
-
-    # Diagram Generation Tools
+  # 绘图生成工具
+  diagram:
     generate_mermaid:
       name: "diagram.generate_mermaid"
       description: "生成 Mermaid 格式的网络拓扑图代码。必须遵循严格的4级层次结构：环境->数据中心->网络区域->设备。确保所有设备都在对应的区域容器内，区域在数据中心内，数据中心在环境内。"

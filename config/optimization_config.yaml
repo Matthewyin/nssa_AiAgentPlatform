@@ -95,7 +95,7 @@ optimization:
     # 存储方式: memory, redis
     storage: memory
   
-  # 3.2 多工具批量规划
+  # 3.2 多工具批量规划（第四阶段优化 - 已启用）
   batch_planning:
     enabled: true
     # 最大批量工具数
@@ -114,4 +114,24 @@ optimization:
     high_complexity_max_iterations: 10
     # 循环检测：连续相同决策的阈值
     loop_detection_threshold: 2
+
+  # 3.4 提前终止策略（第三阶段优化 - 新增）
+  early_termination:
+    enabled: false  # 暂时禁用，等待进一步调试
+    # 置信度阈值（0-1，达到此阈值时提前终止）
+    # 建议值：0.7-0.8，过低可能导致任务未完成就终止
+    confidence_threshold: 0.75
+    # 单 Agent 场景是否启用
+    enable_for_single_agent: true
+    # 多 Agent 场景是否启用（更保守）
+    # 注意：多 Agent 场景下提前终止可能导致任务未完成，建议禁用
+    enable_for_multi_agent: false
+    # 以下工具执行成功后直接终止（不再调用 LLM 判断）
+    # 这些工具的结果通常是明确的，不需要进一步分析
+    # 注意：只在单 Agent 场景下生效
+    auto_terminate_tools:
+      - "mysql.list_tables"
+      - "mysql.describe_table"
+      - "gemini_rag.list_stores"
+      - "gemini_rag.list_documents"
 

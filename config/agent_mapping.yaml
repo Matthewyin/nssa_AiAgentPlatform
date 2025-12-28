@@ -13,6 +13,18 @@ agents:
     description: "网络诊断专家"
     tools_prefix: "network"           # tools_config.yaml 中的工具前缀
   
+  # 绘图生成 Agent
+  diagram:
+    config_key: "diagram"
+    full_name: "diagram_agent"
+    short_names:
+      - "diagram"
+      - "draw"
+      - "绘图"
+      - "拓扑"
+    description: "网络拓扑图绘制专家"
+    tools_prefix: "diagram"
+  
   # 数据库查询 Agent
   database:
     config_key: "database"

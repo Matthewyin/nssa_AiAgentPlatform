@@ -248,6 +248,7 @@ def create_react_graph() -> StateGraph:
         state["last_observation"] = ""
         state["next_action"] = None
         state["execution_history"] = []  # 重置执行历史，避免下一个 Agent 继承前面 Agent 的历史
+        state["tool_queue"] = []  # 重置工具队列，避免下一个 Agent 继承前面 Agent 的队列
 
         logger.info(f"切换到下一个 Agent: {agent_plan[next_index]['name']} ({next_index + 1}/{len(agent_plan)})")
         return state

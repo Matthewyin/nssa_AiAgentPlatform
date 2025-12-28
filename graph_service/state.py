@@ -33,6 +33,7 @@ class GraphState(TypedDict):
     is_finished: bool  # 是否完成任务
     next_action: Optional[Dict[str, Any]]  # LLM决定的下一步行动
     last_observation: str  # 上一步的观察结果
+    tool_queue: List[Dict[str, Any]]  # 批量规划工具队列（优化用）
 
     # 最终输出
     final_answer: str  # 最终回复给用户的答案
