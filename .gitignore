@@ -54,3 +54,7 @@ htmlcov/
 
 # Hypothesis 测试框架缓存
 .hypothesis/
+
+# Go 编译产物
+netprobe/netprobe
+netprobe_bin
