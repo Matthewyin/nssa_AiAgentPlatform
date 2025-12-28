@@ -31,6 +31,9 @@ class MarkdownConverter:
         from .converters.http_converter import HTTPConverter
         from .converters.mtr_converter import MTRConverter
         from .converters.diagnose_converter import DiagnoseConverter
+        from .converters.ping_converter import PingConverter
+        from .converters.traceroute_converter import TracerouteConverter
+        from .converters.tcp_converter import TCPConverter
 
         self._converters = {
             # 网络探测工具
@@ -50,6 +53,15 @@ class MarkdownConverter:
             # 综合诊断
             "network.diagnose": DiagnoseConverter(),
             "diagnose": DiagnoseConverter(),
+            # Ping 探测
+            "network.ping": PingConverter(),
+            "ping": PingConverter(),
+            # Traceroute 探测
+            "network.traceroute": TracerouteConverter(),
+            "traceroute": TracerouteConverter(),
+            # TCP 连接探测
+            "network.tcp": TCPConverter(),
+            "tcp": TCPConverter(),
         }
 
     def convert(self, tool_name: str, result: Dict[str, Any]) -> str:
