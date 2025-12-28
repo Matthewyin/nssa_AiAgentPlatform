@@ -9,21 +9,68 @@ langgraph:
   # Router节点配置
   router:
     # 关键词路由规则
+    # 注意：每条规则的关键词数量会影响匹配分数
+    # 分数 = 匹配关键词数 / 总关键词数
+    # 建议每条规则 2-4 个相关关键词，以获得合理的匹配分数
     keyword_rules:
-      - keywords: ["ping", "连通", "可达", "延迟", "丢包"]
+      # 网络诊断 - 按工具类型分组
+      - keywords: ["ping", "连通"]
         target_node: "network_agent"
-      - keywords: ["traceroute", "路径", "跳数", "路由"]
+        priority: 1
+      - keywords: ["traceroute", "路径追踪"]
         target_node: "network_agent"
-      - keywords: ["dns", "域名", "解析", "nslookup"]
+        priority: 1
+      - keywords: ["nslookup", "dns解析"]
         target_node: "network_agent"
-      - keywords: ["mtr", "网络诊断", "网络测试", "tcp", "http", "tls"]
+        priority: 1
+      - keywords: ["mtr", "网络诊断"]
         target_node: "network_agent"
-      - keywords: ["拓扑", "拓扑图", "绘图", "画图", "画", "mermaid", "excalidraw", "drawio", "网络图"]
+        priority: 1
+      - keywords: ["tcp", "端口"]
+        target_node: "network_agent"
+        priority: 1
+      - keywords: ["tls", "证书"]
+        target_node: "network_agent"
+        priority: 1
+      - keywords: ["http", "https", "网站"]
+        target_node: "network_agent"
+        priority: 1
+      - keywords: ["延迟", "丢包", "可达"]
+        target_node: "network_agent"
+        priority: 1
+      
+      # 绘图 Agent
+      - keywords: ["拓扑", "拓扑图"]
         target_node: "diagram_agent"
-      - keywords: ["数据库", "mysql", "查询", "表", "sql", "select", "database"]
+        priority: 1
+      - keywords: ["绘图", "画图", "网络图"]
+        target_node: "diagram_agent"
+        priority: 1
+      - keywords: ["mermaid", "excalidraw", "drawio"]
+        target_node: "diagram_agent"
+        priority: 1
+      
+      # 数据库 Agent
+      - keywords: ["数据库", "mysql"]
         target_node: "database_agent"
-      - keywords: ["知识库", "文档", "RAG", "检索", "搜索知识", "查找文档", "历史案例"]
+        priority: 1
+      - keywords: ["查询", "表"]
+        target_node: "database_agent"
+        priority: 1
+      - keywords: ["sql", "select"]
+        target_node: "database_agent"
+        priority: 1
+      
+      # 知识库 Agent
+      - keywords: ["知识库", "文档"]
         target_node: "gemini_rag_agent"
+        priority: 1
+      - keywords: ["RAG", "检索"]
+        target_node: "gemini_rag_agent"
+        priority: 1
+      - keywords: ["历史案例", "查找文档"]
+        target_node: "gemini_rag_agent"
+        priority: 1
     
     # 是否使用LLM作为后备路由
     use_llm_fallback: true

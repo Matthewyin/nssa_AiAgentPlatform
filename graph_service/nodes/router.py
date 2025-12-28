@@ -188,6 +188,10 @@ def _keyword_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
 
     根据 langgraph_config.yaml 中的 keyword_rules 进行匹配
     支持置信度评估：匹配多个关键词时置信度更高
+    
+    增强功能：
+    - 检测多 Agent 场景（同时匹配多个不同 Agent 的关键词）
+    - 多 Agent 场景回退到 LLM 路由，以生成正确的执行计划
 
     Args:
         user_query: 用户问题
@@ -205,12 +209,15 @@ def _keyword_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
         opt_config = load_optimization_config()
         intent_config = opt_config.get("optimization", {}).get("intent_classification", {})
         confidence_threshold = intent_config.get("rule_confidence_threshold", 0.5)
+        
+        # 多 Agent 检测阈值（更低，因为复合任务中每个 Agent 的关键词可能较少）
+        # 只要匹配到任意关键词就算有效匹配
+        multi_agent_detection_threshold = 0.1
 
         query_lower = user_query.lower()
 
-        # 计算每个规则的匹配分数
-        best_match = None
-        best_score = 0.0
+        # 收集所有匹配的 Agent 及其分数
+        all_matches = []
 
         for rule in keyword_rules:
             keywords = rule.get("keywords", [])
@@ -238,19 +245,61 @@ def _keyword_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
                 # 分数 = 匹配关键词数 / 总关键词数 * 优先级
                 score = (len(matched_keywords) / len(keywords)) * priority
 
-                if score > best_score:
-                    best_score = score
-                    best_match = {
-                        "target_node": target_node,
-                        "matched_keywords": matched_keywords,
-                        "score": score
-                    }
+                all_matches.append({
+                    "target_node": target_node,
+                    "matched_keywords": matched_keywords,
+                    "score": score,
+                    "matched_count": len(matched_keywords)
+                })
 
-        # 检查是否达到置信度阈值
-        if best_match and best_score >= confidence_threshold:
+        if not all_matches:
+            return None
+
+        # 按分数排序
+        all_matches.sort(key=lambda x: x["score"], reverse=True)
+        best_match = all_matches[0]
+
+        # 检测多 Agent 场景：是否有多个不同的 Agent 都有关键词匹配
+        # 使用更低的阈值来检测多 Agent 场景
+        potential_agents = [
+            m for m in all_matches 
+            if m["score"] >= multi_agent_detection_threshold
+        ]
+        
+        # 去重：同一个 Agent 可能被多条规则匹配
+        unique_agents = {}
+        for m in potential_agents:
+            agent_name = m["target_node"]
+            if agent_name not in unique_agents or m["score"] > unique_agents[agent_name]["score"]:
+                unique_agents[agent_name] = m
+        
+        # 如果有多个不同的 Agent 都有匹配，说明可能是复合任务
+        # 条件：至少有 2 个不同的 Agent，且每个 Agent 至少匹配了 1 个关键词
+        if len(unique_agents) >= 2:
+            # 进一步检查：确保不是误判（例如只是偶然包含了某个关键词）
+            # 要求至少有一个 Agent 达到正常阈值，另一个 Agent 至少匹配了 2 个关键词或达到 0.2 分
+            high_confidence_agents = [
+                name for name, m in unique_agents.items() 
+                if m["score"] >= confidence_threshold
+            ]
+            medium_confidence_agents = [
+                name for name, m in unique_agents.items() 
+                if m["matched_count"] >= 2 or m["score"] >= 0.2
+            ]
+            
+            # 如果有高置信度 Agent，且还有其他中等置信度 Agent，则认为是多 Agent 场景
+            if high_confidence_agents and len(medium_confidence_agents) >= 2:
+                agent_names = list(unique_agents.keys())
+                logger.info(
+                    f"Router: 检测到多 Agent 场景 -> {agent_names}，回退到 LLM 路由以生成执行计划"
+                )
+                return None
+
+        # 单 Agent 场景：检查是否达到置信度阈值
+        if best_match["score"] >= confidence_threshold:
             logger.info(
                 f"Router: 规则引擎匹配 -> {best_match['target_node']} "
-                f"(关键词: {best_match['matched_keywords']}, 置信度: {best_score:.2f})"
+                f"(关键词: {best_match['matched_keywords']}, 置信度: {best_match['score']:.2f})"
             )
 
             return [{
@@ -259,11 +308,10 @@ def _keyword_router(user_query: str) -> Optional[List[Dict[str, Any]]]:
                 "status": "pending"
             }]
 
-        if best_match:
-            logger.info(
-                f"Router: 规则引擎匹配置信度不足 "
-                f"({best_score:.2f} < {confidence_threshold})，回退到 LLM"
-            )
+        logger.info(
+            f"Router: 规则引擎匹配置信度不足 "
+            f"({best_match['score']:.2f} < {confidence_threshold})，回退到 LLM"
+        )
 
         return None
 
