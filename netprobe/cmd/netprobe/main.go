@@ -135,13 +135,20 @@ func main() {
 			err = fmt.Errorf("target is required")
 			break
 		}
-		res = probe.Mtr(probe.MtrOptions{
+		// 使用新版 MtrEnhanced 返回 UnifiedResult 结构
+		unifiedRes := probe.MtrEnhanced(probe.MtrOptions{
 			Target:       *target,
 			Count:        *count,
 			ReportCycles: *reportCycles,
 			TimeoutSec:   *timeout,
 			Tool:         "network.mtr",
 		})
+		// Set source info if probe-id is set
+		if probeID != "" {
+			unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+		}
+		printUnifiedJSON(unifiedRes)
+		return
 
 	case "nslookup":
 		fs := flag.NewFlagSet("nslookup", flag.ExitOnError)
