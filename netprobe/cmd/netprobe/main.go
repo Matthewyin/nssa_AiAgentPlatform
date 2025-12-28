@@ -155,33 +155,24 @@ func main() {
 		target := fs.String("target", "", "domain to query")
 		recordType := fs.String("record-type", "A", "DNS record type")
 		timeout := fs.Int("timeout", 10, "timeout seconds")
-		unified := fs.Bool("unified", true, "use unified output format (default: true)")
 		_ = fs.Parse(args)
 		if *target == "" {
 			err = fmt.Errorf("target is required")
 			break
 		}
-		if *unified {
-			// Use new unified output format
-			unifiedRes := probe.NslookupUnified(probe.NslookupOptions{
-				Target:     *target,
-				RecordType: *recordType,
-				TimeoutSec: *timeout,
-				Tool:       "network.nslookup",
-			})
-			// Set source info if probe-id is set
-			if probeID != "" {
-				unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
-			}
-			printUnifiedJSON(unifiedRes)
-			return
-		}
-		res = probe.Nslookup(probe.NslookupOptions{
+		// 使用 NslookupUnified 返回 UnifiedResult 结构
+		unifiedRes := probe.NslookupUnified(probe.NslookupOptions{
 			Target:     *target,
 			RecordType: *recordType,
 			TimeoutSec: *timeout,
 			Tool:       "network.nslookup",
 		})
+		// Set source info if probe-id is set
+		if probeID != "" {
+			unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+		}
+		printUnifiedJSON(unifiedRes)
+		return
 
 	case "tcp":
 		fs := flag.NewFlagSet("tcp", flag.ExitOnError)
@@ -212,33 +203,13 @@ func main() {
 		caCert := fs.String("ca-cert", "", "CA certificate path")
 		clientCert := fs.String("client-cert", "", "client certificate path")
 		clientKey := fs.String("client-key", "", "client key path")
-		unified := fs.Bool("unified", true, "use unified output format (default: true)")
 		_ = fs.Parse(args)
 		if *host == "" || *port == 0 {
 			err = fmt.Errorf("host and port are required")
 			break
 		}
-		if *unified {
-			// Use new unified output format
-			unifiedRes := probe.TLSProbeUnified(probe.TLSOptions{
-				Host:       *host,
-				Port:       *port,
-				ServerName: *serverName,
-				TimeoutSec: *timeout,
-				Insecure:   *insecure,
-				CACert:     *caCert,
-				ClientCert: *clientCert,
-				ClientKey:  *clientKey,
-				Tool:       "network.tls",
-			})
-			// Set source info if probe-id is set
-			if probeID != "" {
-				unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
-			}
-			printUnifiedJSON(unifiedRes)
-			return
-		}
-		res = probe.TLSProbe(probe.TLSOptions{
+		// 使用 TLSProbeUnified 返回 UnifiedResult 结构
+		unifiedRes := probe.TLSProbeUnified(probe.TLSOptions{
 			Host:       *host,
 			Port:       *port,
 			ServerName: *serverName,
@@ -249,6 +220,12 @@ func main() {
 			ClientKey:  *clientKey,
 			Tool:       "network.tls",
 		})
+		// Set source info if probe-id is set
+		if probeID != "" {
+			unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+		}
+		printUnifiedJSON(unifiedRes)
+		return
 
 	case "http":
 		fs := flag.NewFlagSet("http", flag.ExitOnError)
@@ -279,7 +256,8 @@ func main() {
 				headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 			}
 		}
-		res = probe.HTTPProbe(probe.HTTPOptions{
+		// 使用新版 HTTPProbeUnified 返回 UnifiedResult 结构
+		unifiedRes := probe.HTTPProbeUnified(probe.HTTPOptions{
 			URL:            *url,
 			Method:         *method,
 			Headers:        headers,
@@ -289,6 +267,12 @@ func main() {
 			ExpectContains: *expectContains,
 			Tool:           "network.http",
 		})
+		// Set source info if probe-id is set
+		if probeID != "" {
+			unifiedRes.SetSource(probeID, probeIP, probeLocation, probeISP)
+		}
+		printUnifiedJSON(unifiedRes)
+		return
 
 	case "diagnose":
 		fs := flag.NewFlagSet("diagnose", flag.ExitOnError)
@@ -432,9 +416,9 @@ subcommands:
   ping         --target <host> [--count 4] [--timeout 10]
   trace        --target <host> [--max-hops 30] [--timeout 60]
   mtr          --target <host> [--count 10] [--report-cycles 10] [--timeout 60]
-  nslookup     --target <domain> [--record-type A] [--timeout 10] [--unified true]
+  nslookup     --target <domain> [--record-type A] [--timeout 10]
   tcp          --host <host> --port <port> [--timeout 10] [--retry 0]
-  tls          --host <host> [--port 443] [--server-name <sni>] [--timeout 10] [--insecure] [--ca-cert path] [--client-cert path --client-key path] [--unified true]
+  tls          --host <host> [--port 443] [--server-name <sni>] [--timeout 10] [--insecure] [--ca-cert path] [--client-cert path --client-key path]
   http         --url <url> [--method GET] [--timeout 15] [--expect-status <code>] [--expect-contains <str>] [--body <data>] [--headers <json>] [--header "K: V"]
   diagnose     --target <domain|url> [--port 443] [--timeout 30] [--skip dns,tcp,tls,http,mtr] [--parallel] [--http] [--mtr]
 
