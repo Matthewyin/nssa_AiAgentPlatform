@@ -161,39 +161,74 @@ agents:
       - `diagram.generate_drawio`: 生成 .drawio 文件下载链接
 
       **数据格式 (Universal Topology Schema)**：
-      所有绘图工具接受相同的 JSON 数据结构：
+      所有绘图工具接受相同的 JSON 数据结构。**必须遵循严格的4级层次结构**：
+      
+      ```
+      环境(environment) → 数据中心(datacenter) → 网络区域(network_area) → 设备(node)
+      ```
+      
+      **⚠️ 重要：PARAMS 必须是有效的 JSON 格式，包含 nodes 和 edges 字段！**
+      
+      **调用格式示例**：
+      ```
+      TOOL: diagram.generate_drawio
+      PARAMS: {"containers": [...], "nodes": [...], "edges": [...]}
+      ```
+      
+      **完整参数示例**：
       ```json
       {
+        "containers": [
+          {"id": "env_1", "label": "企业网络环境", "type": "environment", "children": ["dc_1", "dc_2"]},
+          {"id": "dc_1", "label": "安外数据中心", "type": "datacenter", "parent": "env_1", "children": ["area_1"]},
+          {"id": "dc_2", "label": "洋桥数据中心", "type": "datacenter", "parent": "env_1", "children": ["area_2"]},
+          {"id": "area_1", "label": "接入区", "type": "network_area", "parent": "dc_1", "children": ["router_1", "switch_1"]},
+          {"id": "area_2", "label": "接入区", "type": "network_area", "parent": "dc_2", "children": ["router_2", "switch_2"]}
+        ],
         "nodes": [
-          {"id": "router1", "label": "核心路由器", "type": "router"},
-          {"id": "switch1", "label": "接入交换机", "type": "switch", "container": "机房A"},
-          {"id": "pc1", "label": "用户PC", "type": "pc", "container": "办公区"}
+          {"id": "router_1", "label": "核心路由器", "type": "router", "container": "area_1"},
+          {"id": "switch_1", "label": "汇聚交换机", "type": "switch", "container": "area_1"},
+          {"id": "router_2", "label": "核心路由器", "type": "router", "container": "area_2"},
+          {"id": "switch_2", "label": "汇聚交换机", "type": "switch", "container": "area_2"}
         ],
         "edges": [
-          {"source": "router1", "target": "switch1", "label": "10GbE"},
-          {"source": "switch1", "target": "pc1", "label": "1GbE"}
-        ],
-        "containers": [
-          {"id": "机房A", "label": "中心机房", "children": ["switch1"]},
-          {"id": "办公区", "label": "员工办公区", "children": ["pc1"]}
+          {"source": "router_1", "target": "switch_1"},
+          {"source": "router_2", "target": "switch_2"},
+          {"source": "router_1", "target": "router_2", "label": "数据中心互联"}
         ]
       }
       ```
       
+      **关键字段说明**：
+      - `containers[].type`: 必须是 "environment"、"datacenter" 或 "network_area"
+      - `containers[].parent`: 父容器的 id（环境层没有 parent）
+      - `containers[].children`: 子容器或子节点的 id 列表
+      - `nodes[].container`: 节点所属的区域容器 id（必须是 network_area 类型的容器）
+      - `nodes`: **必填字段**，设备节点列表
+      - `edges`: **必填字段**，连接关系列表
+      
       **节点类型 (type)**:
-      - router (路由器)
-      - switch (交换机)
-      - firewall (防火墙)
-      - cloud (云/互联网)
-      - database (数据库)
-      - server (服务器)
+      - router (路由器) - 绿色边框
+      - switch (交换机) - 蓝色边框
+      - firewall (防火墙) - 红色边框
+      - server (服务器) - 橙色边框
+      - database (数据库) - 灰色边框
       - pc (终端/PC)
       - unknown (未知/默认)
 
       **绘图建议**：
       1. 当用户要求"画图"、"生成拓扑图"时，优先使用 `diagram.generate_mermaid` 提供即时预览，如果用户明确要求文件下载，再使用 Excalidraw 或 Draw.io。
-      2. 必须根据上下文构建完整的 `nodes` 和 `edges` 列表。
-      3. 如果有层级关系（如设备在机房内），请使用 `containers` 和 `container` 字段。
+      2. **必须**构建完整的层次结构：environment → datacenter → network_area → node
+      3. **必须**为每个容器设置正确的 `parent` 和 `children` 字段
+      4. **必须**为每个节点设置 `container` 字段，指向其所属的 network_area
+      5. **PARAMS 必须是单行或格式正确的 JSON**，不要使用 Markdown 代码块
+
+      ## 故障处理原则
+      
+      **当执行绘图相关工具（diagram.*）发生错误时，严禁自行尝试执行与绘图无关的诊断工具（如 ping, nslookup, mtr, tcp, http 等）：**
+      1. **禁止应激式诊断**：如果绘图工具由于任何原因报错，请直接向用户准确报告该错误。不要试图通过 ping 或其他工具来“验证”或“猜测”系统状态。
+      2. **保持意图一致**：用户的目标是获取可视化拓扑，提供无关的连通性数据会造成严重误导。
+      3. **专业反馈**：在报错的同时，可以根据错误信息向用户提供如何修正数据结构或反馈系统问题的建议，而不是执行无关工具。
 
 
   # 数据库查询 Agent

@@ -16,6 +16,47 @@ def get_llm():
     return config_manager.get_llm("final_answer")
 
 
+def _extract_text_content(llm_output) -> str:
+    """
+    从 LLM 响应中提取文本内容
+    
+    兼容不同 LLM provider 的响应格式：
+    - DeepSeek/OpenAI/Ollama: content 是 str
+    - Gemini: content 可能是 list（多模态响应格式）
+    
+    Args:
+        llm_output: LLM 响应对象（AIMessage）
+        
+    Returns:
+        提取的文本字符串
+    """
+    if not hasattr(llm_output, 'content'):
+        return str(llm_output)
+    
+    content = llm_output.content
+    
+    # 如果是字符串，直接返回（DeepSeek/OpenAI/Ollama）
+    if isinstance(content, str):
+        return content
+    
+    # 如果是 list，提取所有文本部分（Gemini 多模态格式）
+    if isinstance(content, list):
+        text_parts = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict):
+                # Gemini 格式: {"type": "text", "text": "..."}
+                if 'text' in part:
+                    text_parts.append(part['text'])
+                elif 'content' in part:
+                    text_parts.append(part['content'])
+        return '\n'.join(text_parts)
+    
+    # 其他情况，转为字符串
+    return str(content)
+
+
 def _should_skip_llm_analysis(state: GraphState) -> bool:
     """
     判断是否应该跳过 LLM 综合分析
@@ -193,7 +234,8 @@ def _generate_llm_analysis(user_query: str, execution_history: list, agent_plan:
         analysis = invoke_llm_with_tracking(llm, prompt, "final_answer")
 
         # 从 AIMessage 对象中提取文本内容
-        analysis_text = analysis.content if hasattr(analysis, 'content') else str(analysis)
+        # 注意：Gemini 模型可能返回 list 类型的 content（多模态响应格式）
+        analysis_text = _extract_text_content(analysis)
         return analysis_text.strip()
 
     except Exception as e:
@@ -273,8 +315,19 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
         # 预备结构化数据内容
         structured_content = ""
 
-        # 1. 优先检查标准接口字段 (Scheme 3 预留)
-        if "display_data" in result and isinstance(result["display_data"], dict):
+        # 1. 优先检查是否有完整的 result 数据（用于结构化结果显示全部数据）
+        # 注意：display_data 只包含前 5 条用于快速预览，结构化结果应显示完整数据
+        full_result_data = result.get("result") if isinstance(result, dict) else None
+        
+        # 如果 result 字段是列表（如 SQL 查询结果），优先使用完整数据渲染
+        if isinstance(full_result_data, list) and full_result_data:
+            from ..utils import format_as_markdown_table
+            row_count = len(full_result_data)
+            structured_content += f"\n**查询结果 ({row_count}条)**:\n"
+            structured_content += format_as_markdown_table(full_result_data) + "\n"
+        
+        # 2. 如果没有完整 result 列表，检查 display_data（用于网络工具等）
+        elif "display_data" in result and isinstance(result["display_data"], dict):
             # 如果工具必须返回用于展示的数据
             for k, v in result["display_data"].items():
                 if isinstance(v, list):
@@ -293,7 +346,7 @@ def _format_tool_result_three_sections(tool_name: str, params: Dict[str, Any], r
         elif "summary" in result and isinstance(result["summary"], str):
              structured_content += f"摘要: {result['summary']}\n"
         
-        # 2. 如果没有标准字段，执行通用智能遍历 (Scheme 1 落地)
+        # 3. 如果没有标准字段，执行通用智能遍历 (Scheme 1 落地)
         else:
             # 过滤黑名单字段
             ignored_keys = {"raw_output", "stdout", "stderr", "error", "success", "is_error", "tool", "action", "thought"}

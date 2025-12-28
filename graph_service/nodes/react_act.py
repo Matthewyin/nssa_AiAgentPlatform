@@ -23,6 +23,139 @@ async def get_tool_gateway():
     return _tool_gateway
 
 
+def _extract_json_object(text: str) -> Optional[str]:
+    """
+    从文本中提取完整的 JSON 对象（支持嵌套大括号）
+    
+    Args:
+        text: 以 { 开头的文本
+        
+    Returns:
+        完整的 JSON 字符串，如果无法提取则返回 None
+    """
+    text = text.strip()
+    if not text.startswith('{'):
+        return None
+    
+    depth = 0
+    in_string = False
+    escape_next = False
+    
+    for i, char in enumerate(text):
+        if escape_next:
+            escape_next = False
+            continue
+            
+        if char == '\\' and in_string:
+            escape_next = True
+            continue
+            
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+            
+        if in_string:
+            continue
+            
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0:
+                return text[:i+1]
+    
+    return None
+
+
+def _repair_diagram_params(tool_name: str, params: Dict[str, Any], state: GraphState) -> Dict[str, Any]:
+    """
+    修复 diagram 工具的参数
+    
+    当 params 中缺少 nodes 或 edges 字段时，尝试从 LLM 原始输出中重新提取
+    
+    Args:
+        tool_name: 工具名称
+        params: 当前解析的参数
+        state: 当前状态（包含 next_action.thought 等原始信息）
+        
+    Returns:
+        修复后的参数
+    """
+    # 只处理 diagram 工具
+    if not tool_name.startswith("diagram."):
+        return params
+    
+    # 检查是否缺少必要字段
+    if isinstance(params, dict) and "nodes" in params and "edges" in params:
+        return params  # 参数完整，无需修复
+    
+    logger.warning(f"diagram 工具参数不完整，尝试修复: {list(params.keys()) if isinstance(params, dict) else type(params)}")
+    
+    # 尝试从 state 中获取原始 LLM 输出
+    # 可能的来源：next_action.thought, metadata.raw_llm_output 等
+    raw_sources = []
+    
+    next_action = state.get("next_action", {})
+    if next_action.get("thought"):
+        raw_sources.append(next_action["thought"])
+    
+    # 从 execution_history 中获取最近的 LLM 输出
+    execution_history = state.get("execution_history", [])
+    if execution_history:
+        last_record = execution_history[-1] if execution_history else {}
+        if last_record.get("thought"):
+            raw_sources.append(last_record["thought"])
+    
+    # 尝试从各个来源中提取完整的 JSON 参数
+    for source in raw_sources:
+        if not source:
+            continue
+            
+        # 尝试多种模式提取 JSON
+        patterns = [
+            # 模式 1: PARAMS: {...}
+            r'PARAMS:\s*(\{)',
+            # 模式 2: ```json {...} ```
+            r'```json\s*(\{)',
+            # 模式 3: ``` {...} ```
+            r'```\s*(\{)',
+            # 模式 4: "nodes": [...] 开头的 JSON
+            r'(\{"(?:nodes|containers|edges)")',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, source, re.IGNORECASE | re.DOTALL)
+            if match:
+                # 找到起始位置
+                start_pos = match.start(1)
+                json_text = _extract_json_object(source[start_pos:])
+                
+                if json_text:
+                    try:
+                        extracted_params = json.loads(json_text)
+                        # 验证提取的参数是否包含必要字段
+                        if isinstance(extracted_params, dict) and "nodes" in extracted_params:
+                            logger.info(f"成功从原始输出中修复 diagram 参数，包含字段: {list(extracted_params.keys())}")
+                            return extracted_params
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"JSON 解析失败: {e}")
+                        continue
+    
+    # 如果仍然无法修复，尝试构建最小有效参数
+    if not isinstance(params, dict):
+        params = {}
+    
+    if "nodes" not in params:
+        params["nodes"] = []
+        logger.warning("无法修复 nodes 字段，使用空列表")
+    
+    if "edges" not in params:
+        params["edges"] = []
+        logger.warning("无法修复 edges 字段，使用空列表")
+    
+    return params
+
+
 async def react_act_node(state: GraphState) -> GraphState:
     """ReAct 行动节点
 
@@ -94,6 +227,13 @@ async def react_act_node(state: GraphState) -> GraphState:
                     logger.warning(
                         f"自动补全 mysql database 参数时出现异常: {str(e)}"
                     )
+
+            # 对 diagram 工具进行参数修复（当 nodes/edges 缺失时尝试从原始输出中提取）
+            if tool_name.startswith("diagram."):
+                try:
+                    params = _repair_diagram_params(tool_name, params, state)
+                except Exception as e:
+                    logger.warning(f"修复 diagram 参数时出现异常: {str(e)}")
 
             # 获取调用者 Agent 和会话信息
             caller_agent = state.get("target_agent", "unknown_agent")

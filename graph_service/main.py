@@ -49,11 +49,58 @@ app.include_router(openai_router, tags=["OpenAI Compatible API"])
 # 注册 Server Registry API 路由
 app.include_router(registry_router, tags=["Server Registry"])
 
-# 挂载静态文件目录 (用于 serving 生成的绘图文件)
-from fastapi.staticfiles import StaticFiles
+# 文件下载端点（支持强制下载）
+from fastapi.responses import FileResponse
+
 artifacts_path = Path(__file__).parent.parent / "data" / "artifacts"
 artifacts_path.mkdir(parents=True, exist_ok=True)
-app.mount("/files", StaticFiles(directory=str(artifacts_path)), name="files")
+
+
+@app.get("/files/{file_path:path}")
+async def download_file(file_path: str):
+    """
+    文件下载端点
+    
+    支持的文件类型：.drawio, .excalidraw, .mmd
+    设置 Content-Disposition 头强制浏览器下载而不是显示
+    """
+    full_path = artifacts_path / file_path
+    
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    if not full_path.is_file():
+        raise HTTPException(status_code=400, detail="不是有效的文件")
+    
+    # 安全检查：确保路径在 artifacts 目录内
+    try:
+        full_path.resolve().relative_to(artifacts_path.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="禁止访问")
+    
+    # 根据文件扩展名设置 MIME 类型
+    filename = full_path.name
+    ext = full_path.suffix.lower()
+    
+    media_type_map = {
+        ".drawio": "application/xml",
+        ".excalidraw": "application/json",
+        ".mmd": "text/plain",
+        ".json": "application/json",
+        ".xml": "application/xml",
+    }
+    
+    media_type = media_type_map.get(ext, "application/octet-stream")
+    
+    # 返回文件响应，设置下载头
+    return FileResponse(
+        path=full_path,
+        filename=filename,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 # 编译LangGraph图

@@ -1,0 +1,26 @@
+graph TD
+    subgraph env_1["全球企业网络"]
+    subgraph dc_anwai["安外数据中心"]
+    subgraph area_anwai_access["安外接入区"]
+        r_anwai{{"安外核心路由器"}}
+        as_anwai["安外汇聚交换机"]
+        s_anwai_1["安外接入交换机01"]
+        s_anwai_2["安外接入交换机02"]
+    end
+    end
+    subgraph dc_yangqiao["洋桥数据中心"]
+    subgraph area_yangqiao_access["洋桥接入区"]
+        r_yangqiao{{"洋桥核心路由器"}}
+        as_yangqiao["洋桥汇聚交换机"]
+        s_yangqiao_1["洋桥接入交换机01"]
+        s_yangqiao_2["洋桥接入交换机02"]
+    end
+    end
+    end
+    r_anwai --> as_anwai
+    as_anwai --> s_anwai_1
+    as_anwai --> s_anwai_2
+    r_yangqiao --> as_yangqiao
+    as_yangqiao --> s_yangqiao_1
+    as_yangqiao --> s_yangqiao_2
+    r_anwai -- "DCI互联" --> r_yangqiao

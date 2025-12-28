@@ -1,0 +1,34 @@
+graph TD
+    subgraph 企业网络环境["企业网络环境"]
+    subgraph 安外数据中心["安外数据中心"]
+    subgraph 安外核心区["核心区"]
+        aw_core_router{{"安外核心路由器"}}
+    end
+    subgraph 安外汇聚区["汇聚区"]
+        aw_agg_switch["安外汇聚交换机"]
+    end
+    subgraph 安外接入区["接入区"]
+        aw_acc_switch1["安外接入交换机1"]
+        aw_acc_switch2["安外接入交换机2"]
+    end
+    end
+    subgraph 洋桥数据中心["洋桥数据中心"]
+    subgraph 洋桥核心区["核心区"]
+        yq_core_router{{"洋桥核心路由器"}}
+    end
+    subgraph 洋桥汇聚区["汇聚区"]
+        yq_agg_switch["洋桥汇聚交换机"]
+    end
+    subgraph 洋桥接入区["接入区"]
+        yq_acc_switch1["洋桥接入交换机1"]
+        yq_acc_switch2["洋桥接入交换机2"]
+    end
+    end
+    end
+    aw_core_router -- "高速链路" --> aw_agg_switch
+    aw_agg_switch -- "千兆链路" --> aw_acc_switch1
+    aw_agg_switch -- "千兆链路" --> aw_acc_switch2
+    yq_core_router -- "高速链路" --> yq_agg_switch
+    yq_agg_switch -- "千兆链路" --> yq_acc_switch1
+    yq_agg_switch -- "千兆链路" --> yq_acc_switch2
+    aw_core_router -- "跨数据中心互联" --> yq_core_router

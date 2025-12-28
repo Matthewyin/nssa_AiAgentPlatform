@@ -231,11 +231,11 @@ tools:
           body: "--body"
           headers: "--headers"
 
-    # Diagram Tools (Exposed to Network Agent)    # ... (other network tools) ...
 
-    # Diagram Tools
+
+    # Diagram Generation Tools
     generate_mermaid:
-      name: "network.generate_mermaid"
+      name: "diagram.generate_mermaid"
       description: "生成 Mermaid 格式的网络拓扑图代码。必须遵循严格的4级层次结构：环境->数据中心->网络区域->设备。确保所有设备都在对应的区域容器内，区域在数据中心内，数据中心在环境内。"
       parameters:
         nodes:
@@ -253,7 +253,7 @@ tools:
       timeout: 30
 
     generate_excalidraw:
-      name: "network.generate_excalidraw"
+      name: "diagram.generate_excalidraw"
       description: "生成 Excalidraw 文件下载链接。必须遵循严格的4级层次结构：环境->数据中心->网络区域->设备。"
       parameters:
         nodes:
@@ -264,10 +264,14 @@ tools:
           type: "array"
           description: "边列表"
           required: true
+        containers:
+          type: "array"
+          description: "容器/子图列表，包含Environment, DataCenter, NetworkArea类型的容器"
+          required: false
       timeout: 30
 
     generate_drawio:
-      name: "network.generate_drawio"
+      name: "diagram.generate_drawio"
       description: "生成 Draw.io 文件下载链接。必须遵循严格的4级层次结构：环境->数据中心->网络区域->设备。"
       parameters:
         nodes:
@@ -278,7 +282,14 @@ tools:
           type: "array"
           description: "边列表"
           required: true
+        containers:
+          type: "array"
+          description: "容器/子图列表，包含Environment, DataCenter, NetworkArea类型的容器"
+          required: false
       timeout: 30
+
+
+
 
   # MySQL 数据库工具
   # 注意：这些工具定义仅用于文档和提示，实际工具由 mcp-server-mysql 提供

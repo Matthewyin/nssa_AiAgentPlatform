@@ -44,7 +44,9 @@ app = Server("network-mcp")
 TOOLS_CONFIG = load_tools_config()
 NETWORK_TOOLS = TOOLS_CONFIG.get("tools", {}).get("network", {})
 TOOL_CONFIG_MAP = {
-    cfg.get("name"): cfg for cfg in NETWORK_TOOLS.values() if isinstance(cfg, dict) and cfg.get("name")
+    cfg.get("name"): cfg 
+    for cfg in NETWORK_TOOLS.values() 
+    if isinstance(cfg, dict) and cfg.get("name") and "runner" in cfg
 }
 
 

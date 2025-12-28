@@ -1,0 +1,26 @@
+graph TD
+    subgraph company_network["公司网络环境"]
+    subgraph aw_dc["安外数据中心"]
+    subgraph aw_access_zone["接入区"]
+        aw_core_router{{"核心路由器"}}
+        aw_agg_switch["汇聚交换机"]
+        aw_access_switch1["接入交换机1"]
+        aw_access_switch2["接入交换机2"]
+    end
+    end
+    subgraph yq_dc["洋桥数据中心"]
+    subgraph yq_access_zone["接入区"]
+        yq_core_router{{"核心路由器"}}
+        yq_agg_switch["汇聚交换机"]
+        yq_access_switch1["接入交换机1"]
+        yq_access_switch2["接入交换机2"]
+    end
+    end
+    end
+    aw_core_router --> aw_agg_switch
+    aw_agg_switch --> aw_access_switch1
+    aw_agg_switch --> aw_access_switch2
+    yq_core_router --> yq_agg_switch
+    yq_agg_switch --> yq_access_switch1
+    yq_agg_switch --> yq_access_switch2
+    aw_core_router -- "跨数据中心互联" --> yq_core_router

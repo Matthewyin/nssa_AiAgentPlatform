@@ -6,10 +6,41 @@ import json
 import re
 import yaml
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from loguru import logger
 from ..state import GraphState
 from utils import load_langgraph_config, load_router_prompt_config, settings, get_config_manager, load_optimization_config
+
+
+def _extract_text_content(llm_output) -> str:
+    """
+    从 LLM 响应中提取文本内容
+    
+    兼容不同 LLM provider 的响应格式：
+    - DeepSeek/OpenAI/Ollama: content 是 str
+    - Gemini: content 可能是 list（多模态响应格式）
+    """
+    if not hasattr(llm_output, 'content'):
+        return str(llm_output)
+    
+    content = llm_output.content
+    
+    if isinstance(content, str):
+        return content
+    
+    if isinstance(content, list):
+        text_parts = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict):
+                if 'text' in part:
+                    text_parts.append(part['text'])
+                elif 'content' in part:
+                    text_parts.append(part['content'])
+        return '\n'.join(text_parts)
+    
+    return str(content)
 
 
 def router_node(state: GraphState) -> GraphState:
@@ -615,7 +646,8 @@ def _llm_router(user_query: str) -> Optional[Dict[str, Any]]:
         response = invoke_llm_with_tracking(llm, full_prompt, "router")
 
         # 从 AIMessage 对象中提取文本内容
-        response_text = response.content if hasattr(response, 'content') else str(response)
+        # 兼容 Gemini 的 list 类型 content
+        response_text = _extract_text_content(response)
         logger.info(f"Router: LLM 响应: {response_text[:200]}...")
 
         # 解析 LLM 响应

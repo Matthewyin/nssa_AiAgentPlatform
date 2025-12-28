@@ -173,7 +173,6 @@ tools:
       require_confirmation: false
 
   # ============== 绘图工具 ==============
-  # ============== 绘图工具 ==============
   # 生成 Mermaid 图
   generate_mermaid:
     logical_name: "network.generate_mermaid"
@@ -182,7 +181,7 @@ tools:
     tags: ["diagram", "mermaid", "visualization"]
     bindings:
       - mcp_server: "diagram-mcp"
-        physical_tool: "network.generate_mermaid"
+        physical_tool: "diagram.generate_mermaid"
         environment: "default"
         priority: 1
         enabled: true
@@ -203,7 +202,7 @@ tools:
     tags: ["diagram", "excalidraw", "visualization"]
     bindings:
       - mcp_server: "diagram-mcp"
-        physical_tool: "network.generate_excalidraw"
+        physical_tool: "diagram.generate_excalidraw"
         environment: "default"
         priority: 1
         enabled: true
@@ -223,7 +222,7 @@ tools:
     tags: ["diagram", "drawio", "visualization"]
     bindings:
       - mcp_server: "diagram-mcp"
-        physical_tool: "network.generate_drawio"
+        physical_tool: "diagram.generate_drawio"
         environment: "default"
         priority: 1
         enabled: true
@@ -234,5 +233,6 @@ tools:
     permissions:
       allowed_agents: ["network_agent"]
       require_confirmation: false
+
 
 

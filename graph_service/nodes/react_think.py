@@ -2,7 +2,7 @@
 ReAct Think Node
 思考节点：LLM 观察当前状态并决定下一步行动
 """
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from loguru import logger
 from ..state import GraphState
 from ..utils import smart_truncate, get_tool_type, extract_result_summary, compress_execution_history
@@ -15,6 +15,91 @@ def get_llm():
     """获取或创建 LLM 实例（使用配置管理器）"""
     config_manager = get_config_manager()
     return config_manager.get_llm("react_think")
+
+
+def _extract_text_content(llm_output) -> str:
+    """
+    从 LLM 响应中提取文本内容
+    
+    兼容不同 LLM provider 的响应格式：
+    - DeepSeek/OpenAI/Ollama: content 是 str
+    - Gemini: content 可能是 list（多模态响应格式）
+    
+    Args:
+        llm_output: LLM 响应对象（AIMessage）
+        
+    Returns:
+        提取的文本字符串
+    """
+    if not hasattr(llm_output, 'content'):
+        return str(llm_output)
+    
+    content = llm_output.content
+    
+    # 如果是字符串，直接返回（DeepSeek/OpenAI/Ollama）
+    if isinstance(content, str):
+        return content
+    
+    # 如果是 list，提取所有文本部分（Gemini 多模态格式）
+    if isinstance(content, list):
+        text_parts = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict):
+                # Gemini 格式: {"type": "text", "text": "..."}
+                if 'text' in part:
+                    text_parts.append(part['text'])
+                elif 'content' in part:
+                    text_parts.append(part['content'])
+        return '\n'.join(text_parts)
+    
+    # 其他情况，转为字符串
+    return str(content)
+
+
+def _extract_json_object(text: str) -> str:
+    """
+    从文本中提取完整的 JSON 对象（支持嵌套大括号）
+    
+    Args:
+        text: 以 { 开头的文本
+        
+    Returns:
+        完整的 JSON 字符串，如果无法提取则返回 None
+    """
+    text = text.strip()
+    if not text.startswith('{'):
+        return None
+    
+    depth = 0
+    in_string = False
+    escape_next = False
+    
+    for i, char in enumerate(text):
+        if escape_next:
+            escape_next = False
+            continue
+            
+        if char == '\\' and in_string:
+            escape_next = True
+            continue
+            
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+            
+        if in_string:
+            continue
+            
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0:
+                return text[:i+1]
+    
+    return None
 
 
 def _get_agent_config(target_agent: str) -> Dict[str, Any]:
@@ -287,19 +372,34 @@ def parse_llm_output(output: str, tools_prefix: str = None) -> Dict[str, Any]:
                     break
 
         # 提取 PARAMS（支持多种格式）
-        params_patterns = [
-            r'PARAMS:\s*(\{.+?\})(?=\n[A-Z]|\n\n|$)',
-            r'"PARAMS":\s*(\{.+?\})',
-            r'参数[:：]\s*(\{.+?\})',
-        ]
-        for pattern in params_patterns:
-            params_match = re.search(pattern, output, re.DOTALL | re.IGNORECASE)
-            if params_match:
-                try:
-                    result["params"] = json.loads(params_match.group(1))
-                    break
-                except json.JSONDecodeError as e:
-                    logger.warning(f"解析参数 JSON 失败: {e}")
+        # 使用更智能的方式匹配完整的嵌套 JSON
+        params_text = None
+        
+        # 方式 1: 尝试从 PARAMS: 后面提取完整的 JSON
+        params_start_match = re.search(r'PARAMS:\s*', output, re.IGNORECASE)
+        if params_start_match:
+            start_pos = params_start_match.end()
+            params_text = _extract_json_object(output[start_pos:])
+        
+        # 方式 2: 尝试 "PARAMS": {...} 格式
+        if not params_text:
+            params_start_match = re.search(r'"PARAMS":\s*', output, re.IGNORECASE)
+            if params_start_match:
+                start_pos = params_start_match.end()
+                params_text = _extract_json_object(output[start_pos:])
+        
+        # 方式 3: 中文格式
+        if not params_text:
+            params_start_match = re.search(r'参数[:：]\s*', output)
+            if params_start_match:
+                start_pos = params_start_match.end()
+                params_text = _extract_json_object(output[start_pos:])
+        
+        if params_text:
+            try:
+                result["params"] = json.loads(params_text)
+            except json.JSONDecodeError as e:
+                logger.warning(f"解析参数 JSON 失败: {e}, JSON 文本: {params_text[:200]}...")
 
         # 自动补全工具名称前缀
         if result["tool_name"] and tools_prefix:
@@ -328,19 +428,22 @@ def parse_llm_output(output: str, tools_prefix: str = None) -> Dict[str, Any]:
     batch_tools = []
     for i in range(1, 10):  # 最多支持 9 个批量工具
         tool_pattern = rf'TOOL_{i}:\s*([a-zA-Z_][a-zA-Z0-9_.]*)'
-        params_pattern = rf'PARAMS_{i}:\s*(\{{.+?\}})(?=\n[A-Z]|\nTOOL_|\n\n|$)'
 
         tool_match = re.search(tool_pattern, output, re.IGNORECASE)
         if tool_match:
             tool_name = tool_match.group(1).strip()
             params = {}
 
-            params_match = re.search(params_pattern, output, re.DOTALL | re.IGNORECASE)
-            if params_match:
-                try:
-                    params = json.loads(params_match.group(1))
-                except json.JSONDecodeError:
-                    pass
+            # 使用智能 JSON 提取
+            params_start_match = re.search(rf'PARAMS_{i}:\s*', output, re.IGNORECASE)
+            if params_start_match:
+                start_pos = params_start_match.end()
+                params_text = _extract_json_object(output[start_pos:])
+                if params_text:
+                    try:
+                        params = json.loads(params_text)
+                    except json.JSONDecodeError:
+                        pass
 
             # 自动补全工具名称前缀
             if tools_prefix:
@@ -475,7 +578,8 @@ async def react_think_node(state: GraphState) -> GraphState:
         llm_output = invoke_llm_with_tracking(llm, prompt, "react_think")
 
         # 从 AIMessage 对象中提取文本内容
-        llm_output_text = llm_output.content if hasattr(llm_output, 'content') else str(llm_output)
+        # 注意：Gemini 模型可能返回 list 类型的 content（多模态响应格式）
+        llm_output_text = _extract_text_content(llm_output)
         logger.info(f"LLM 输出:\n{llm_output_text[:500]}...")
 
         # 解析 LLM 输出（传递 tools_prefix 用于自动补全工具名称）

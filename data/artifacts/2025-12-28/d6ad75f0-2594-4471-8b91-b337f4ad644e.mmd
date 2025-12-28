@@ -1,0 +1,26 @@
+graph TD
+    subgraph env_1["企业网络环境"]
+    subgraph dc_1["安外数据中心"]
+    subgraph area_1["接入区"]
+        router_1{{"核心路由器"}}
+        switch_1["汇聚交换机"]
+        aswitch_1["接入交换机1"]
+        aswitch_2["接入交换机2"]
+    end
+    end
+    subgraph dc_2["洋桥数据中心"]
+    subgraph area_2["接入区"]
+        router_2{{"核心路由器"}}
+        switch_2["汇聚交换机"]
+        aswitch_3["接入交换机1"]
+        aswitch_4["接入交换机2"]
+    end
+    end
+    end
+    router_1 --> switch_1
+    switch_1 --> aswitch_1
+    switch_1 --> aswitch_2
+    router_2 --> switch_2
+    switch_2 --> aswitch_3
+    switch_2 --> aswitch_4
+    router_1 -- "数据中心互联" --> router_2

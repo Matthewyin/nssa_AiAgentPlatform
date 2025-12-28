@@ -1,0 +1,26 @@
+graph TD
+    subgraph env_enterprise["企业网络"]
+    subgraph dc_anwai["安外数据中心"]
+    subgraph zone_access_anwai["接入区"]
+        anwai_core_router{{"核心路由器"}}
+        anwai_agg_switch["汇聚交换机"]
+        anwai_access_1["接入交换机1"]
+        anwai_access_2["接入交换机2"]
+    end
+    end
+    subgraph dc_yangqiao["洋桥数据中心"]
+    subgraph zone_access_yangqiao["接入区"]
+        yangqiao_core_router{{"核心路由器"}}
+        yangqiao_agg_switch["汇聚交换机"]
+        yangqiao_access_1["接入交换机1"]
+        yangqiao_access_2["接入交换机2"]
+    end
+    end
+    end
+    anwai_core_router --> anwai_agg_switch
+    anwai_agg_switch --> anwai_access_1
+    anwai_agg_switch --> anwai_access_2
+    yangqiao_core_router --> yangqiao_agg_switch
+    yangqiao_agg_switch --> yangqiao_access_1
+    yangqiao_agg_switch --> yangqiao_access_2
+    anwai_core_router -- "数据中心互联" --> yangqiao_core_router

@@ -34,11 +34,12 @@ class Container(BaseModel):
     id: str
     label: str
     type: NodeType = NodeType.UNKNOWN
-    parent: Optional[str] = None # ID of parent container
-    children: List[str] = Field(default_factory=list) # IDs of child containers or nodes
+    parent: Optional[str] = None  # ID of parent container
+    children: List[str] = Field(default_factory=list)  # IDs of child containers or nodes
     metadata: Dict[str, Any] = Field(default_factory=dict)
     
     # Layout properties (calculated by LayoutEngine)
+    # 坐标系统：左上角坐标（x, y 表示元素左上角的绝对位置）
     x: Optional[float] = None
     y: Optional[float] = None
     width: Optional[float] = None
@@ -51,15 +52,16 @@ class Node(BaseModel):
     id: str
     label: str
     type: NodeType = NodeType.UNKNOWN
-    container: Optional[str] = None # ID of the container it belongs to
+    container: Optional[str] = None  # ID of the container it belongs to
     ip: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     # Layout properties (calculated by LayoutEngine)
+    # 坐标系统：左上角坐标（x, y 表示元素左上角的绝对位置）
     x: Optional[float] = None
     y: Optional[float] = None
-    width: Optional[float] = 80.0 # Default width
-    height: Optional[float] = 80.0 # Default height
+    width: Optional[float] = None  # 由 LayoutEngine 计算
+    height: Optional[float] = None  # 由 LayoutEngine 计算
 
 class Edge(BaseModel):
     """
@@ -80,3 +82,7 @@ class Topology(BaseModel):
     containers: List[Container] = Field(default_factory=list)
     nodes: List[Node] = Field(default_factory=list)
     edges: List[Edge] = Field(default_factory=list)
+
+    class Config:
+        extra = "ignore"
+
