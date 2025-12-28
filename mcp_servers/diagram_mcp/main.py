@@ -124,43 +124,6 @@ async def list_tools() -> List[Tool]:
         traceback.print_exc()
 
     return tools
-            description = tool_config.get("description")
-            
-            # Construct input schema
-            # We assume the config in YAML closely matches the JSON Schema structure 
-            # or is simplified. Here we reconstruct it.
-            properties = {}
-            required_params = []
-            
-            for param_name, param_cfg in tool_config.get("parameters", {}).items():
-                properties[param_name] = {
-                    "type": param_cfg.get("type"),
-                    "description": param_cfg.get("description")
-                }
-                if param_cfg.get("required"):
-                    required_params.append(param_name)
-            
-            # Create Tool object
-            tool = Tool(
-                name=name,
-                description=description,
-                inputSchema={
-                    "type": "object",
-                    "properties": properties,
-                    "required": required_params,
-                    "additionalProperties": False # Enforce strict schema if needed
-                }
-            )
-            tools.append(tool)
-            
-    except Exception as e:
-        # Fallback or log error if config fails
-        # For now, let's just log and return empty list or re-raise
-        print(f"Error loading tools config: {e}")
-        import traceback
-        traceback.print_exc()
-
-    return tools
 
 @app.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
@@ -178,7 +141,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         
         result_text = ""
         
-        if name == "generate_mermaid":
+        if name == "network.generate_mermaid":
             formatter = MermaidFormatter()
             mermaid_code = formatter.format(topology)
             
@@ -188,13 +151,13 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             # Return code block for rendering
             result_text = f"Mermaid Source (saved to {url}):\n\n```mermaid\n{mermaid_code}\n```"
             
-        elif name == "generate_excalidraw":
+        elif name == "network.generate_excalidraw":
             formatter = ExcalidrawFormatter()
             content = formatter.format(topology)
             url = _save_file(content, "excalidraw")
             result_text = f"Excalidraw file generated successfully.\n[📥 Download .excalidraw]({url})"
             
-        elif name == "generate_drawio":
+        elif name == "network.generate_drawio":
             formatter = DrawIOFormatter()
             content = formatter.format(topology)
             url = _save_file(content, "drawio")
