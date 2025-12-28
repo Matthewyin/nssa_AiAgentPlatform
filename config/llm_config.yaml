@@ -5,8 +5,8 @@
 llm:
   # 当前使用的 Provider，可选：ollama / openai / gemini / deepseek
   # provider: "ollama"
-  provider: "gemini"
-  # provider: "deepseek"
+  # provider: "gemini"
+  provider: "deepseek"
 
   # 通用参数（所有 Provider 共用）
   # model: "deepseek-reasoner"
