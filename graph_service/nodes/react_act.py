@@ -248,6 +248,9 @@ async def react_act_node(state: GraphState) -> GraphState:
                     # 需要 target 参数的工具
                     target_tools = ["network.ping", "network.traceroute", "network.nslookup", "network.mtr"]
                     
+                    # 需要 host 参数的工具（tcp/tls 使用 host 而非 target）
+                    host_tools = ["network.tcp", "network.tls"]
+                    
                     if tool_name in target_tools:
                         # 如果没有 target 参数，尝试从其他参数名中获取
                         if "target" not in params:
@@ -260,6 +263,21 @@ async def react_act_node(state: GraphState) -> GraphState:
                                 logger.debug(f"未找到需要修正的参数，当前参数: {list(params.keys())}")
                         else:
                             logger.debug(f"参数已包含 target，无需修正")
+                    
+                    elif tool_name in host_tools:
+                        # tcp/tls 工具需要 host 参数，LLM 可能错误使用 target
+                        if "host" not in params:
+                            # 尝试从 target 或其他常见参数名中获取
+                            host_alternatives = ["target", "hostname", "ip", "address", "domain"]
+                            for alt_name in host_alternatives:
+                                if alt_name in params:
+                                    params["host"] = params.pop(alt_name)
+                                    logger.info(f"参数修正: {alt_name} -> host = {params['host']}")
+                                    break
+                            else:
+                                logger.debug(f"未找到需要修正的 host 参数，当前参数: {list(params.keys())}")
+                        else:
+                            logger.debug(f"参数已包含 host，无需修正")
                 except Exception as e:
                     logger.warning(f"修正 network 工具参数时出现异常: {str(e)}")
 
