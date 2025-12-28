@@ -175,7 +175,7 @@ tools:
   # ============== 绘图工具 ==============
   # 生成 Mermaid 图
   generate_mermaid:
-    logical_name: "network.generate_mermaid"
+    logical_name: "diagram.generate_mermaid"
     description: "生成 Mermaid 格式的拓扑图代码"
     category: "diagram"
     tags: ["diagram", "mermaid", "visualization"]
@@ -191,12 +191,12 @@ tools:
       additionalProperties: true
       required: ["nodes", "edges"]
     permissions:
-      allowed_agents: ["network_agent", "database_agent"]
+      allowed_agents: ["diagram_agent"]
       require_confirmation: false
 
   # 生成 Excalidraw 文件
   generate_excalidraw:
-    logical_name: "network.generate_excalidraw"
+    logical_name: "diagram.generate_excalidraw"
     description: "生成 Excalidraw (JSON) 格式的绘图文件"
     category: "diagram"
     tags: ["diagram", "excalidraw", "visualization"]
@@ -211,12 +211,12 @@ tools:
       additionalProperties: true
       required: ["nodes", "edges"]
     permissions:
-      allowed_agents: ["network_agent"]
+      allowed_agents: ["diagram_agent"]
       require_confirmation: false
 
   # 生成 Draw.io 文件
   generate_drawio:
-    logical_name: "network.generate_drawio"
+    logical_name: "diagram.generate_drawio"
     description: "生成 Draw.io (XML) 格式的绘图文件"
     category: "diagram"
     tags: ["diagram", "drawio", "visualization"]
@@ -231,7 +231,7 @@ tools:
       additionalProperties: true
       required: ["nodes", "edges"]
     permissions:
-      allowed_agents: ["network_agent"]
+      allowed_agents: ["diagram_agent"]
       require_confirmation: false
 
 

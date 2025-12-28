@@ -118,11 +118,13 @@ def _get_agent_config(target_agent: str) -> Dict[str, Any]:
     mapping_config = load_agent_mapping_config()
     agents_mapping = mapping_config.get("agents", {})
 
-    # 查找对应的 config_key
+    # 查找对应的 config_key 和 tools_prefix
     config_key = None
+    tools_prefix = None
     for agent_info in agents_mapping.values():
         if agent_info.get("full_name") == target_agent:
             config_key = agent_info.get("config_key")
+            tools_prefix = agent_info.get("tools_prefix")
             break
 
     if not config_key:
@@ -133,7 +135,13 @@ def _get_agent_config(target_agent: str) -> Dict[str, Any]:
     agent_config = load_agent_config()
     agents = agent_config.get("agents", {})
 
-    return agents.get(config_key, {})
+    result = agents.get(config_key, {})
+    
+    # 优先使用 agent_mapping.yaml 中的 tools_prefix
+    if tools_prefix:
+        result["tools_prefix"] = tools_prefix
+    
+    return result
 
 
 def build_think_prompt(state: GraphState, available_tools: list) -> str:
@@ -312,12 +320,18 @@ def parse_llm_output(output: str, tools_prefix: str = None) -> Dict[str, Any]:
         else:
             result["action_type"] = "TOOL"
             result["tool_name"] = action_value
+            # 修正工具前缀
+            if tools_prefix:
+                result["tool_name"] = _ensure_tool_prefix(result["tool_name"], tools_prefix)
 
     # 提取 TOOL
     if result["action_type"] == "TOOL" and not result["tool_name"]:
         tool_match = re.search(r'TOOL:\s*([a-zA-Z_][a-zA-Z0-9_.]*)', output, re.IGNORECASE)
         if tool_match:
             result["tool_name"] = tool_match.group(1).strip()
+            # 修正工具前缀
+            if tools_prefix:
+                result["tool_name"] = _ensure_tool_prefix(result["tool_name"], tools_prefix)
 
     # 提取 PARAMS
     if result["action_type"] == "TOOL":
@@ -373,16 +387,23 @@ def parse_llm_output(output: str, tools_prefix: str = None) -> Dict[str, Any]:
 
 
 def _ensure_tool_prefix(tool_name: str, tools_prefix: str) -> str:
-    """确保工具名称包含前缀"""
+    """确保工具名称包含正确的前缀"""
     if not tool_name or not tools_prefix:
         return tool_name
 
+    # 如果已经是正确的前缀，直接返回
     if tool_name.startswith(tools_prefix + "."):
         return tool_name
 
+    # 如果包含其他前缀（如 network.xxx），需要替换为正确的前缀
     if "." in tool_name:
-        return tool_name
+        # 提取工具名（去掉错误的前缀）
+        actual_tool_name = tool_name.split(".", 1)[1]
+        full_tool_name = f"{tools_prefix}.{actual_tool_name}"
+        logger.info(f"修正工具前缀: {tool_name} -> {full_tool_name}")
+        return full_tool_name
 
+    # 没有前缀，添加前缀
     full_tool_name = f"{tools_prefix}.{tool_name}"
     logger.info(f"自动补全工具名称: {tool_name} -> {full_tool_name}")
     return full_tool_name

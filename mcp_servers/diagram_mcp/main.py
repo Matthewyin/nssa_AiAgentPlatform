@@ -75,13 +75,13 @@ async def list_tools() -> List[Tool]:
     
     try:
         config = load_tools_config()
-        network_tools = config.get("tools", {}).get("network", {})
+        diagram_tools = config.get("tools", {}).get("diagram", {})
 
         
         # Tools we want to expose
         target_tools = ["diagram.generate_mermaid", "diagram.generate_excalidraw", "diagram.generate_drawio"]
         
-        for tool_key, tool_config in network_tools.items():
+        for tool_key, tool_config in diagram_tools.items():
 
             name = tool_config.get("name")
             
