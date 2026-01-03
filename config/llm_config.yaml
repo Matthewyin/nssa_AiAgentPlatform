@@ -63,7 +63,8 @@ gemini_rag:
   # RAG 模型，建议使用 flash 版本以节省配额
   # gemini-2.5-flash: 每分钟 15 次，每天 1500 次
   # gemini-2.5-pro: 每分钟 5 次，每天 25 次（配额很低！）
-  model: "gemini-3-pro-preview"
+  model: "gemini-3-flash-preview"
+  # model: "gemini-3-pro-preview"
 
 # Embedding 配置（保持与之前兼容）
 embedding:
